@@ -1,0 +1,55 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31402.337
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QTRHack.Kernel", "QTRHack.Kernel\QTRHack.Kernel.csproj", "{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QTRHack.UI", "QTRHack.UI\QTRHack.UI.csproj", "{5D312851-8454-433C-8857-8FE05EFE8A5A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QTRHack.Test", "QTRHack.Test\QTRHack.Test.csproj", "{D9BCBADB-6765-4B37-A1C5-20CC17136C2F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QHackLib", "QHackLib\QHackLib.csproj", "{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Keystone.Net", "Keystone.Net\Keystone.Net.csproj", "{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QTRHack.Core", "QTRHack.Core\QTRHack.Core.csproj", "{23060F64-2564-44DA-BBFC-ED3CA6AF48D1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D312851-8454-433C-8857-8FE05EFE8A5A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D312851-8454-433C-8857-8FE05EFE8A5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D312851-8454-433C-8857-8FE05EFE8A5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D312851-8454-433C-8857-8FE05EFE8A5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9BCBADB-6765-4B37-A1C5-20CC17136C2F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9BCBADB-6765-4B37-A1C5-20CC17136C2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9BCBADB-6765-4B37-A1C5-20CC17136C2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9BCBADB-6765-4B37-A1C5-20CC17136C2F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23060F64-2564-44DA-BBFC-ED3CA6AF48D1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23060F64-2564-44DA-BBFC-ED3CA6AF48D1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23060F64-2564-44DA-BBFC-ED3CA6AF48D1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23060F64-2564-44DA-BBFC-ED3CA6AF48D1}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {57805515-476F-4789-98AC-E8C164C56CAE}
+	EndGlobalSection
+EndGlobal

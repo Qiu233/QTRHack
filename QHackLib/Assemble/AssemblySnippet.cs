@@ -1,0 +1,283 @@
+﻿using Microsoft.Diagnostics.Runtime;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace QHackLib.Assemble
+{
+	public class AssemblySnippet : AssemblyCode
+	{
+		private static Random random = new Random();
+		public List<AssemblyCode> Content
+		{
+			get;
+		}
+
+		private AssemblySnippet()
+		{
+			Content = new List<AssemblyCode>();
+		}
+
+		public static AssemblySnippet FromEmpty()
+		{
+			return new AssemblySnippet();
+		}
+
+		public static AssemblySnippet FromASMCode(string asm)
+		{
+			AssemblySnippet s = new AssemblySnippet();
+
+			Instruction[] ss = asm.Split(new string[] { "\n" }, StringSplitOptions.RemoveEmptyEntries).Select(t => Instruction.Create(t)).ToArray();
+			s.Content.AddRange(ss);
+			return s;
+		}
+
+		public static AssemblySnippet FromCode(IEnumerable<AssemblyCode> code)
+		{
+			AssemblySnippet s = new AssemblySnippet();
+			s.Content.AddRange(code);
+			return s;
+		}
+		/// <summary>
+		/// inside loop,[esp] is the iterator
+		/// ecx will be changed
+		/// </summary>
+		/// <param name="body"></param>
+		/// <param name="times"></param>
+		/// <param name="regProtection"></param>
+		/// <returns></returns>
+		public static AssemblySnippet Loop(AssemblySnippet body, int times, bool regProtection)
+		{
+
+			byte[] lA = new byte[16];
+			byte[] lB = new byte[16];
+			random.NextBytes(lA);
+			random.NextBytes(lB);
+			AssemblySnippet s = new AssemblySnippet();
+			string labelA = "lab_" + string.Concat(lA.Select(t => t.ToString("x2")));
+			string labelB = "lab_" + string.Concat(lB.Select(t => t.ToString("x2")));
+			if (regProtection)
+				s.Content.Add(Instruction.Create("push ecx"));
+			s.Content.Add(Instruction.Create("mov ecx,0"));
+			s.Content.Add(Instruction.Create("" + labelA + ":"));
+			s.Content.Add(Instruction.Create("cmp ecx," + times + ""));
+			s.Content.Add(Instruction.Create("jge " + labelB + ""));
+			s.Content.Add(Instruction.Create("push ecx"));
+			s.Content.Add(body);
+			s.Content.Add(Instruction.Create("pop ecx"));
+			s.Content.Add(Instruction.Create("inc ecx"));
+			s.Content.Add(Instruction.Create("jmp " + labelA + ""));
+			s.Content.Add(Instruction.Create("" + labelB + ":"));
+			if (regProtection)
+				s.Content.Add(Instruction.Create("pop ecx"));
+			return s;
+		}
+
+		/// <summary>
+		/// ecx,edx,eax will be changed
+		/// eax will keep the return value
+		/// </summary>
+		/// <param name="ctx"></param>
+		/// <param name="strMemPtr">char* pointer of the string to be constructed</param>
+		/// <param name="retPtr">the pointer to receive the result</param>
+		/// <returns></returns>
+		/*public static AssemblySnippet ConstructString(Context ctx, int strMemPtr, int? retPtr)
+		{
+			var mscorlib_AddrHelper = ctx.GetAddressHelper("mscorlib.dll");
+			int ctor = mscorlib_AddrHelper.GetFunctionAddress("System.String", "CtorCharPtr");
+			if (retPtr == null)
+				return FromClrCall(ctor, null, false, 0, strMemPtr);
+			return FromClrCall(ctor, retPtr, false, 0, strMemPtr);
+		}*/
+
+		/// <summary>
+		/// load an assembly
+		/// ecx,eax will be changed
+		/// </summary>
+		/// <param name="ctx"></param>
+		/// <param name="assemblyFileNamePtr"></param>
+		/// <returns></returns>
+		/*public static AssemblySnippet LoadAssembly(Context ctx, int assemblyFileNamePtr)
+		{
+			var mscorlib_AddrHelper = ctx.GetAddressHelper("mscorlib.dll");
+			int loadFrom = mscorlib_AddrHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
+			return FromClrCall(loadFrom, null, false, assemblyFileNamePtr);
+		}*/
+
+		public static bool IsPTypePassingMustOnStack(string typeName)
+		{
+			switch (typeName)
+			{
+				case "System.Int64":
+				case "System.UInt64":
+				case "System.Single":
+				case "System.Double":
+					return true;
+				default:
+					return false;
+			}
+		}
+
+		private static object[] ProcessUserArgs(object[] userArgs)
+		{
+			List<object> processedUserArgs = new List<object>();
+			foreach (var arg in userArgs)
+			{
+				Type type = arg.GetType();
+				if (arg is IAddressableTypedEntity entity)//ClrObject or ClrValueType
+				{
+					if (arg is ClrValueType val)//ValueType
+					{
+						int size = val.Type.StaticSize - 8;
+						byte[] data = new byte[size];
+						val.Type.Module.AppDomain.Runtime.DataTarget.DataReader.Read(val.Address, new Span<byte>(data));
+						ClrType valType = val.Type;
+						if (size == 4 && valType.Fields.Length == 1 && valType.Fields[0].Type.IsPrimitive &&
+							!IsPTypePassingMustOnStack(valType.Name))
+							processedUserArgs.Add(BitConverter.ToInt32(data, 0));//int normal
+						else
+							processedUserArgs.Add(data);//byte[] on stack
+					}
+					else
+						processedUserArgs.Add((int)entity.Address);//int(ptr) normal
+				}
+				else if (type.IsValueType)
+				{
+					if (type.IsPrimitive)
+					{
+						processedUserArgs.Add(arg);//normal
+					}
+					else
+					{
+						int size = Marshal.SizeOf(type);
+						byte[] data = new byte[size];
+						IntPtr ptr = Marshal.AllocHGlobal(size);
+						Marshal.StructureToPtr(arg, ptr, false);
+						Marshal.Copy(ptr, data, 0, size);
+						Marshal.FreeHGlobal(ptr);
+						processedUserArgs.Add(data);//normal
+					}
+				}
+				else//ref
+					throw new QHackLibException("Can only pass game object and value");
+			}
+			return processedUserArgs.ToArray();
+		}
+
+		private static AssemblyCode GetArugumentsPassing(int? thisPtr, int? retBuf, object[] userArgs)
+		{
+			AssemblySnippet snippet = new AssemblySnippet();
+			int index = 0;
+			int reg = 0;
+			int stack = 0;
+			object[] args = ProcessUserArgs(userArgs);
+			if (thisPtr != null)
+				snippet.Content.Add((Instruction)$"mov {(reg++ == 0 ? "ecx" : "edx")},{thisPtr.Value}");
+			if (retBuf != null)
+				snippet.Content.Add((Instruction)$"mov {(reg++ == 0 ? "ecx" : "edx")},{retBuf.Value}");
+			foreach (var arg in args)
+			{
+				Type type = arg.GetType();
+				if (type == typeof(byte[]))
+				{
+					byte[] data = arg as byte[];
+					int count = (data.Length + 3) / 4;
+					byte[] targetData = new byte[count * 4];
+					Array.Clear(targetData, 0, targetData.Length);//0
+					Array.Copy(data, targetData, data.Length);
+					for (int i = 0; i < count; i++)
+					{
+						snippet.Content.Add((Instruction)$"push {BitConverter.ToUInt32(targetData, (count - i - 1) * 4)}");
+					}
+					stack += count;
+				}
+				else if (type.IsPrimitive)
+				{
+					if (IsPTypePassingMustOnStack(type.Name))
+					{
+						if (type.Name == "System.Int64" || type.Name == "System.UInt64")
+						{
+							byte[] data = BitConverter.GetBytes((ulong)arg);
+							uint low = BitConverter.ToUInt32(data, 0);
+							uint high = BitConverter.ToUInt32(data, 32);
+							snippet.Content.Add((Instruction)$"push {high}");
+							snippet.Content.Add((Instruction)$"push {low}");
+							stack += 2;
+						}
+						else if (type.Name == "System.Double")
+						{
+							byte[] data = BitConverter.GetBytes((double)arg);
+							uint low = BitConverter.ToUInt32(data, 0);
+							uint high = BitConverter.ToUInt32(data, 32);
+							snippet.Content.Add((Instruction)$"push {high}");
+							snippet.Content.Add((Instruction)$"push {low}");
+							stack += 2;
+						}
+						else//float
+						{
+							byte[] data = BitConverter.GetBytes((float)arg);
+							snippet.Content.Add((Instruction)$"push {BitConverter.ToUInt32(data, 0)}");
+							stack++;
+						}
+					}
+					else
+					{
+						uint value = Convert.ToUInt32(arg);
+						if (reg < 2)
+						{
+							snippet.Content.Add((Instruction)$"mov {(reg++ == 0 ? "ecx" : "edx")},{value}");
+						}
+						else
+						{
+							snippet.Content.Add((Instruction)$"push {value}");
+							stack++;
+						}
+					}
+				}
+				else//ref
+					throw new QHackLibException("Can only pass game value and byte[]");
+				index++;
+			}
+			return snippet;
+		}
+
+		public static AssemblySnippet FromClrCall(int targetAddr, bool regProtection, int? thisPtr, int? retBuf, params object[] arguments)
+		{
+			AssemblySnippet s = new AssemblySnippet();
+			if (regProtection)
+			{
+				s.Content.Add(Instruction.Create("push ecx"));
+				s.Content.Add(Instruction.Create("push edx"));
+			}
+			s.Content.Add(GetArugumentsPassing(thisPtr, retBuf, arguments));
+			s.Content.Add(Instruction.Create("call " + (targetAddr).ToString()));
+			if (regProtection)
+			{
+				s.Content.Add(Instruction.Create("pop edx"));
+				s.Content.Add(Instruction.Create("pop ecx"));
+			}
+			return s;
+		}
+		public override string GetCode()
+		{
+			StringBuilder sb = new StringBuilder("");
+			Content.ForEach(s => sb.Append(s.GetCode() + "\n"));
+			return sb.ToString();
+		}
+		public override byte[] GetByteCode(int IP)
+		{
+			List<byte> bs = new List<byte>();
+			bs.AddRange(Assembler.Assemble(GetCode(), IP));
+			return bs.ToArray();
+		}
+		public AssemblySnippet Copy()
+		{
+			AssemblySnippet ss = new AssemblySnippet();
+			ss.Content.AddRange(Content);
+			return ss;
+		}
+	}
+}

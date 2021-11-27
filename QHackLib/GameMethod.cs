@@ -64,6 +64,10 @@ namespace QHackLib
 			return !(a == b);
 		}
 	}
+
+	/// <summary>
+	/// 
+	/// </summary>
 	public class GameMethodCall
 	{
 		public GameMethod Method { get; }

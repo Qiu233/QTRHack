@@ -30,7 +30,7 @@ namespace QHackLib.Assemble
 		}
 		public static explicit operator Instruction(string s)
 		{
-			return Instruction.Create(s);
+			return Create(s);
 		}
 	}
 }

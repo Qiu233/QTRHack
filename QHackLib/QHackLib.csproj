@@ -22,6 +22,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,7 +32,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <UseVSHostingProcess>false</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'ENG|AnyCPU'">
@@ -91,18 +92,15 @@
     <Compile Include="Assemble\AssemblySnippet.cs" />
     <Compile Include="Assemble\Instruction.cs" />
     <Compile Include="Context.cs" />
-    <Compile Include="FunctionHelper\CustomFunctions.cs" />
+    <Compile Include="DataAccess.cs" />
     <Compile Include="Assemble\Ldasm.cs" />
     <Compile Include="AddressHelper.cs" />
     <Compile Include="FunctionHelper\InlineHook.cs" />
     <Compile Include="FunctionHelper\RemoteExecution.cs" />
     <Compile Include="GameMethod.cs" />
     <Compile Include="GameObject.cs" />
-    <Compile Include="NativeFunctions.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="QHackLibException.cs" />
     <Compile Include="AobscanHelper.cs" />
-    <Compile Include="ValueTypeMeasurer.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Keystone.Net\Keystone.Net.csproj">

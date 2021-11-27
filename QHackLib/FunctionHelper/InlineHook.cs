@@ -8,32 +8,47 @@ using System.Threading.Tasks;
 
 namespace QHackLib.FunctionHelper
 {
-	public class InlineHook
+	public unsafe class InlineHook
 	{
-		public struct HookInfo
+		[StructLayout(LayoutKind.Sequential)]
+		public unsafe struct HookInfo
 		{
-			public int CodeAddress;
-			public int ComparisonFlagAddress;
-			public int ComparisonInstructionAddress;
-			public byte[] RawCodeBytes;
+			public const int RawCodeBytesLength = 20;
+			public static readonly int HeaderSize = sizeof(HookInfo);
+			public static readonly int Offset_OnceFlag = (int)Marshal.OffsetOf<HookInfo>("OnceFlag");
+			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<HookInfo>("SafeFreeFlag");
+			public static readonly int Offset_RawCodeLength = (int)Marshal.OffsetOf<HookInfo>("RawCodeLength");
+			public static readonly int Offset_RawCodeBytes = (int)Marshal.OffsetOf<HookInfo>("RawCodeBytes");
 
-			public HookInfo(int codeAddress, int comparisonFlagAddress, int comparisonInstructionAddress, byte[] rawCodeBytes)
+			public int Address_Code => AllocationAddress + HeaderSize;
+			public int Address_OnceFlag => AllocationAddress + Offset_OnceFlag;
+			public int Address_SafeFreeFlag => AllocationAddress + Offset_SafeFreeFlag;
+			public int Address_RawCodeLength => AllocationAddress + Offset_RawCodeLength;
+			public int Address_RawCodeBytes => AllocationAddress + Offset_RawCodeBytes;
+
+			public HookInfo(int allocationAddress, int onceFlag, int safeFreeFlag, byte[] rawCodeBytes)
 			{
-				CodeAddress = codeAddress;
-				ComparisonFlagAddress = comparisonFlagAddress;
-				ComparisonInstructionAddress = comparisonInstructionAddress;
-				RawCodeBytes = rawCodeBytes;
+				AllocationAddress = allocationAddress;
+				OnceFlag = onceFlag;
+				SafeFreeFlag = safeFreeFlag;
+				RawCodeLength = rawCodeBytes.Length;
+				for (int i = 0; i < rawCodeBytes.Length; i++)
+					RawCodeBytes[i] = rawCodeBytes[i];
 			}
+
+			public int AllocationAddress;
+			public int OnceFlag;
+			public int SafeFreeFlag;
+			public int RawCodeLength;
+			public fixed byte RawCodeBytes[RawCodeBytesLength];
 		}
-		private static readonly Object thisLock = new Object();
-		private const int CodeOffset = 64;
 		private InlineHook() { }
 
 		public static byte[] GetHeadBytes(byte[] code)
 		{
 			IntPtr ptr3 = Marshal.AllocHGlobal(code.Length);
 			Marshal.Copy(code, 0, ptr3, code.Length);
-			UInt32 len = 0;
+			uint len;
 			unsafe
 			{
 				byte* p = (byte*)ptr3.ToPointer();
@@ -41,10 +56,10 @@ namespace QHackLib.FunctionHelper
 				while (i - p < 5)
 				{
 					Ldasm.ldasm_data data = new Ldasm.ldasm_data();
-					UInt32 t = Ldasm.ldasm(i, ref data, false);
+					uint t = Ldasm.ldasm(i, ref data, false);
 					i += t;
 				}
-				len = (UInt32)(i - p);
+				len = (uint)(i - p);
 			}
 			Marshal.FreeHGlobal(ptr3);
 			byte[] v = new byte[len];
@@ -57,73 +72,47 @@ namespace QHackLib.FunctionHelper
 
 		public static void InjectAndWait(Context Context, AssemblyCode snippet, int targetAddr, bool once)
 		{
-			var t = Inject(Context, snippet, targetAddr, once);
+			HookInfo hookInfo = Inject(Context, snippet, targetAddr, once);
 			System.Threading.Thread.Sleep(10);
-			while (true)
-			{
-				int y = 0;
-				NativeFunctions.ReadProcessMemory(Context.Handle, t.ComparisonInstructionAddress, ref y, 4, 0);
-				if (y == 0)
-				{
-					if (t.ComparisonFlagAddress == 0)
-					{
-						NativeFunctions.WriteProcessMemory(Context.Handle, targetAddr, t.RawCodeBytes, t.RawCodeBytes.Length, 0);
-						NativeFunctions.VirtualFreeEx(Context.Handle, t.CodeAddress, 0);
-						NativeFunctions.VirtualFreeEx(Context.Handle, t.ComparisonInstructionAddress, 0);
-						return;
-					}
-					else
-					{
-						NativeFunctions.ReadProcessMemory(Context.Handle, t.ComparisonFlagAddress, ref y, 4, 0);
-						if (y == 0)
-						{
-							NativeFunctions.WriteProcessMemory(Context.Handle, targetAddr, t.RawCodeBytes, t.RawCodeBytes.Length, 0);
-							NativeFunctions.VirtualFreeEx(Context.Handle, t.CodeAddress, 0);
-							NativeFunctions.VirtualFreeEx(Context.Handle, t.ComparisonFlagAddress, 0);
-							NativeFunctions.VirtualFreeEx(Context.Handle, t.ComparisonInstructionAddress, 0);
-							return;
-						}
-					}
-				}
-			}
+			int sffAddr = hookInfo.Address_SafeFreeFlag;
+			int ofAddr = hookInfo.Address_OnceFlag;
+			while (Context.DataAccess.Read<int>(sffAddr) != 0 ||
+					Context.DataAccess.Read<int>(ofAddr) != 0) { }
+			Context.DataAccess.Write(targetAddr, hookInfo.RawCodeBytes, hookInfo.RawCodeLength);
+			Context.DataAccess.FreeMemory(hookInfo.AllocationAddress);
 		}
 
 		public static void FreeHook(Context Context, int targetAddr)
 		{
-			int t = 0, y = 0, j = 0, k = targetAddr;
-			int headLen = 0;
-			byte[] head;
+			int k = targetAddr;
 
-			byte h = 0;
-			NativeFunctions.ReadProcessMemory(Context.Handle, targetAddr, ref h, 1, 0);
-			if (h != 0xE9) return;
+			byte h = Context.DataAccess.Read<byte>(targetAddr);
+			if (h != 0xE9) throw new ArgumentException("Not a hooked target");
 
-			NativeFunctions.ReadProcessMemory(Context.Handle, targetAddr + 1, ref j, 4, 0);
-			k += j + 5 - CodeOffset;
-			NativeFunctions.ReadProcessMemory(Context.Handle, k, ref t, 4, 0);
-			NativeFunctions.ReadProcessMemory(Context.Handle, k + 4, ref y, 4, 0);
-			NativeFunctions.ReadProcessMemory(Context.Handle, k + 8, ref headLen, 4, 0);
-			head = new byte[headLen];
-			NativeFunctions.ReadProcessMemory(Context.Handle, k + 0xc, head, headLen, 0);
+			int j = Context.DataAccess.Read<int>(targetAddr + 1);
+			k += j + 5 - HookInfo.HeaderSize;
+			HookInfo info = Context.DataAccess.Read<HookInfo>(k);
 
-			NativeFunctions.WriteProcessMemory(Context.Handle, targetAddr, head, headLen, 0);
-
-			NativeFunctions.VirtualFreeEx(Context.Handle, t, 0);
-			NativeFunctions.VirtualFreeEx(Context.Handle, y, 0);
-			NativeFunctions.VirtualFreeEx(Context.Handle, k, 0);
+			Context.DataAccess.Write(targetAddr, info.RawCodeBytes, info.RawCodeLength);
+			Context.DataAccess.FreeMemory(info.AllocationAddress);
 		}
 
-
-		private static byte[] ProcessJmps(byte[] b, int rawAddr, int targetAddr)
+		/// <summary>
+		/// Repoint the jmps
+		/// </summary>
+		/// <param name="insts"></param>
+		/// <param name="rawAddr"></param>
+		/// <param name="targetAddr"></param>
+		/// <returns></returns>
+		private static byte[] ProcessJmps(byte[] insts, int rawAddr, int targetAddr)
 		{
-
-			IntPtr ptr3 = Marshal.AllocHGlobal(b.Length);
-			Marshal.Copy(b, 0, ptr3, b.Length);
+			IntPtr ptr3 = Marshal.AllocHGlobal(insts.Length);
+			Marshal.Copy(insts, 0, ptr3, insts.Length);
 			unsafe
 			{
 				byte* p = (byte*)ptr3;
 				byte* i = p;
-				while (i - p < b.Length)
+				while (i - p < insts.Length)
 				{
 					if (*i == 0xe9 || *i == 0xe8)//jmp or call
 						*((int*)(i + 1)) += rawAddr - targetAddr;//move the call
@@ -132,9 +121,20 @@ namespace QHackLib.FunctionHelper
 					i += t;
 				}
 			}
-			byte[] result = new byte[b.Length];
-			Marshal.Copy(ptr3, result, 0, b.Length);
+			byte[] result = new byte[insts.Length];
+			Marshal.Copy(ptr3, result, 0, insts.Length);
 			Marshal.FreeHGlobal(ptr3);
+			return result;
+		}
+
+		private static AssemblyCode GetOnceCheckedCode(AssemblyCode code, int onceFlagAddr)
+		{
+			AssemblySnippet result = AssemblySnippet.FromEmpty();
+			result.Content.Add(Instruction.Create("cmp dword ptr [" + onceFlagAddr + "],0"));
+			result.Content.Add(Instruction.Create("jle bodyEnd"));
+			result.Content.Add(code);
+			result.Content.Add(Instruction.Create("dec dword ptr [" + onceFlagAddr + "]"));
+			result.Content.Add(Instruction.Create("bodyEnd:"));
 			return result;
 		}
 
@@ -142,80 +142,44 @@ namespace QHackLib.FunctionHelper
 		/// 这个函数被lock了，无法被多个线程同时调用，预防了一些错误
 		/// </summary>
 		/// <param name="Context"></param>
-		/// <param name="snippet"></param>
+		/// <param name="code"></param>
 		/// <param name="targetAddr"></param>
 		/// <param name="once"></param>
 		/// <param name="execRaw"></param>
-		/// <param name="codeSize"></param>
+		/// <param name="size"></param>
 		/// <returns></returns>
-		public static HookInfo Inject(Context Context, AssemblyCode snippet, int targetAddr, bool once, bool execRaw = true, int codeSize = 1024)
+		public static HookInfo Inject(Context Context, AssemblyCode code, int targetAddr, bool once, bool execRaw = true, int size = 1024)
 		{
-			lock (thisLock)
-			{
-				int codeAddr = NativeFunctions.VirtualAllocEx(Context.Handle, 0, codeSize, NativeFunctions.AllocationType.MEM_COMMIT, NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE);
-				int compAddr = NativeFunctions.VirtualAllocEx(Context.Handle, 0, codeSize, NativeFunctions.AllocationType.MEM_COMMIT, NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE);
-				int flagAddr = 0;
+			byte[] headInstBytes = GetHeadBytes(Context.DataAccess.ReadBytes(targetAddr, 32));
 
-				AssemblySnippet a = AssemblySnippet.FromEmpty();
-				a.Content.Add(Instruction.Create("__$$__:"));//very begin
-				a.Content.Add(Instruction.Create("mov dword ptr [" + compAddr + "],1"));
-				if (once)
-				{
-					flagAddr = NativeFunctions.VirtualAllocEx(Context.Handle, 0, codeSize, NativeFunctions.AllocationType.MEM_COMMIT, NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE);
-					NativeFunctions.WriteProcessMemory(Context.Handle, flagAddr, ref once, 4, 0);
-					a.Content.Add(Instruction.Create("cmp dword ptr [" + flagAddr + "],0"));
-					a.Content.Add(Instruction.Create("jle jalkjflakjl"));
-				}
-				a.Content.Add(snippet);
-				if (once)
-				{
-					a.Content.Add(Instruction.Create("dec dword ptr [" + flagAddr + "]"));
-					a.Content.Add(Instruction.Create("jalkjflakjl:"));
-				}
-				byte[] code = new byte[32];
-				NativeFunctions.ReadProcessMemory(Context.Handle, targetAddr, code, code.Length, 0);
+			int allocAddr = Context.DataAccess.AllocMemory(size);
+			int safeFreeFlagAddr = allocAddr + HookInfo.Offset_SafeFreeFlag;
+			int onceFlagAddr = allocAddr + HookInfo.Offset_OnceFlag;
+			int codeAddr = allocAddr + HookInfo.HeaderSize;
+			int retAddr = targetAddr + headInstBytes.Length;
+
+			HookInfo info = new HookInfo(allocAddr, 1, 1, headInstBytes);
+
+			Assembler assembler = new Assembler(allocAddr);
+			assembler.Emit(DataAccess.GetBytes(info));//emit the header before runnable code
+			assembler.Assemble($"mov dword ptr [{safeFreeFlagAddr}],1");
+			assembler.Assemble(once ? GetOnceCheckedCode(code, onceFlagAddr) : code);//once or not
+			if (execRaw)
+				assembler.Emit(ProcessJmps(headInstBytes, targetAddr, assembler.IP));//emit the raw code replaced by hook jmp
+			assembler.Assemble($"mov dword ptr [{safeFreeFlagAddr}],0");
+			assembler.Assemble("jmp " + retAddr);
 
 
-				byte[] headBytes = GetHeadBytes(code);
-				int headLen = headBytes.Length;
+			byte[] jmpToBytesRaw = Assembler.Assemble($"jmp {codeAddr}", targetAddr);
+			byte[] jmpToBytes = new byte[headInstBytes.Length];
+			for (int i = 0; i < 5; i++)
+				jmpToBytes[i] = jmpToBytesRaw[i];
+			for (int i = 5; i < headInstBytes.Length; i++)
+				jmpToBytes[i] = 0x90;//nop
 
-				NativeFunctions.WriteProcessMemory(Context.Handle, codeAddr, ref flagAddr, 4, 0);//0-4
-				NativeFunctions.WriteProcessMemory(Context.Handle, codeAddr + 4, ref compAddr, 4, 0);//4-8
-				NativeFunctions.WriteProcessMemory(Context.Handle, codeAddr + 8, ref headLen, 4, 0);//8-c
-				NativeFunctions.WriteProcessMemory(Context.Handle, codeAddr + 0xc, headBytes, headLen, 0);//c-1c
-
-				int addr = codeAddr + CodeOffset;
-				byte[] snippetBytes = a.GetByteCode(addr);
-
-
-				NativeFunctions.WriteProcessMemory(Context.Handle, addr, snippetBytes, snippetBytes.Length, 0);
-				addr += snippetBytes.Length;
-
-				if (execRaw)
-				{
-					byte[] bs = ProcessJmps(headBytes, targetAddr, addr);
-					NativeFunctions.WriteProcessMemory(Context.Handle, addr, bs, bs.Length, 0);
-					addr += headBytes.Length;
-				}
-
-				byte[] compBytes = Assembler.Assemble("mov dword ptr [" + compAddr + "],0", addr);
-				NativeFunctions.WriteProcessMemory(Context.Handle, addr, compBytes, compBytes.Length, 0);
-				addr += compBytes.Length;
-
-
-				byte[] jmpBackBytes = Assembler.Assemble("jmp " + (targetAddr + headBytes.Length), addr);
-				NativeFunctions.WriteProcessMemory(Context.Handle, addr, jmpBackBytes, jmpBackBytes.Length, 0);
-				addr += jmpBackBytes.Length;
-
-				byte[] jmpToBytesRaw = Assembler.Assemble("jmp " + (codeAddr + CodeOffset), targetAddr);
-				byte[] jmpToBytes = new byte[headBytes.Length];
-				for (int i = 0; i < 5; i++)
-					jmpToBytes[i] = jmpToBytesRaw[i];
-				for (int i = 5; i < headBytes.Length; i++)
-					jmpToBytes[i] = 0x90;//nop
-				NativeFunctions.WriteProcessMemory(Context.Handle, targetAddr, jmpToBytes, jmpToBytes.Length, 0);
-				return new HookInfo(codeAddr, flagAddr, compAddr, headBytes);
-			}
+			Context.DataAccess.WriteBytes(allocAddr, assembler.Data.ToArray());
+			Context.DataAccess.WriteBytes(targetAddr, jmpToBytes);
+			return info;
 		}
 	}
 }

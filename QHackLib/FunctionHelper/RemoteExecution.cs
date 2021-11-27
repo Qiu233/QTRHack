@@ -2,65 +2,113 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace QHackLib.FunctionHelper
 {
-	public class RemoteExecution : IDisposable
+	public unsafe class RemoteExecution : IDisposable
 	{
-		private int FlagAddress;
-		public int Address
-		{
-			get;
-		}
+		[DllImport("kernel32.dll")]
+		internal static extern IntPtr CreateRemoteThread(
+			int hProcess,
+			int lpThreadAttributes,
+			int dwStackSize,
+			int lpStartAddress, // in remote process
+			int lpParameter,
+			int dwCreationFlags,
+			out int lpThreadId
+		);
+		private readonly RemoteExecutionHeader Header;
+
+		/// <summary>
+		/// Indicates whether the code memory can be safely released.<br/>
+		/// Note that this 
+		/// </summary>
+		public int SafeFreeFlagAddress => Header.Address_SafeFreeFlag;
+		public int CodeAddress => Header.Address_Code;
+
 		public Context Context
 		{
 			get;
 		}
-		public int Thread
+		public int ThreadID
 		{
 			get;
 			private set;
 		}
-		private RemoteExecution(Context c, AssemblySnippet asm)
+		private RemoteExecution(Context ctx, AssemblyCode asm)
 		{
-			Thread = 0;
-			Context = c;
-			FlagAddress = NativeFunctions.VirtualAllocEx(c.Handle, 0, 4, NativeFunctions.AllocationType.MEM_COMMIT, NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE);
-			int z = 0;
-			NativeFunctions.WriteProcessMemory(Context.Handle, FlagAddress, ref z, 4, 0);
-			Address = NativeFunctions.VirtualAllocEx(c.Handle, 0, 1024, NativeFunctions.AllocationType.MEM_COMMIT, NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE);
-			List<byte> code = new List<byte>();
-			byte[] b = asm.GetByteCode(Address);
-			code.AddRange(b);
-			code.AddRange(Assembler.Assemble("inc [0x" + FlagAddress.ToString("X8") + "]", 0));
-			code.AddRange(Assembler.Assemble("ret", 0));
+			Context = ctx;
+			Header = new RemoteExecutionHeader
+			{
+				AllocationAddress = Context.DataAccess.AllocMemory(),
+				SafeFreeFlag = 1//normally 1, which ensures the code will run at lease once before get released
+			};
 
-			NativeFunctions.WriteProcessMemory(c.Handle, Address, code.ToArray(), code.Count, 0);
-		}
-		public static RemoteExecution Create(Context c, AssemblySnippet asm)
-		{
-			return new RemoteExecution(c, asm);
-		}
-		public void Execute()
-		{
-			NativeFunctions.CreateRemoteThread(Context.Handle, 0, 0, Address, 0, 0, out int th);
-			Thread = th;
+			Assembler assembler = new Assembler(Header.AllocationAddress);
+			assembler.Emit(DataAccess.GetBytes(Header));
+			assembler.Assemble($"mov dword ptr [{Header.Address_SafeFreeFlag}],1");
+			assembler.Assemble(asm);
+			assembler.Assemble($"mov dword ptr [{Header.Address_SafeFreeFlag}],0");
+			assembler.Assemble("ret");
+			Context.DataAccess.WriteBytes(Header.AllocationAddress, assembler.Data.ToArray());
 		}
 
-		public void Close()
+		/// <summary>
+		/// <para>Allocates space and fills the code in before calling <see cref="RemoteExecution.RunOnNativeThread"/> to start a remote native thread.</para>
+		/// <para>To avoid a memory leak, call <see cref="RemoteExecution.Dispose"/> to release the allocated space when the thread is not running.</para>
+		/// </summary>
+		/// <param name="ctx"></param>
+		/// <param name="asm"></param>
+		/// <returns></returns>
+		public static RemoteExecution Create(Context ctx, AssemblyCode asm)
 		{
-			int v = 0;
-			while (v == 0 && Thread != 0)
-				NativeFunctions.ReadProcessMemory(Context.Handle, FlagAddress, ref v, 4, 0);
-			NativeFunctions.VirtualFreeEx(Context.Handle, Address, 0);
-			NativeFunctions.VirtualFreeEx(Context.Handle, FlagAddress, 0);
+			return new RemoteExecution(ctx, asm);
 		}
 
+		/// <summary>
+		/// Directly starts a remote native thread.<br/>
+		/// Note that native threads have no clr info and hence cannot do such things like allocate space on clr's heaps.
+		/// </summary>
+		/// <returns>ThreadID of the remote thread created</returns>
+		public int RunOnNativeThread()
+		{
+			CreateRemoteThread(Context.Handle, 0, 0, Header.Address_Code, 0, 0, out int tid);
+			ThreadID = tid;
+			return ThreadID;
+		}
+
+		/// <summary>
+		/// Starts a managed thread.<br/>
+		/// Pending implementation.
+		/// </summary>
+		public void RunOnManagedThread()
+		{
+			throw new NotImplementedException();
+		}
+
+		/// <summary>
+		/// Calling this method will wait till the SafeFreeFlag become 0 before releasing the memory.<br/>
+		/// </summary>
 		public void Dispose()
 		{
-			Close();
+			int sffAddr = Header.Address_SafeFreeFlag;
+			while (Context.DataAccess.Read<int>(sffAddr) != 0) { }
+			Context.DataAccess.FreeMemory(Header.AllocationAddress);
+		}
+
+		[StructLayout(LayoutKind.Sequential)]
+		private struct RemoteExecutionHeader
+		{
+			public static readonly int HeaderSize = sizeof(RemoteExecutionHeader);
+			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<RemoteExecutionHeader>("SafeFreeFlag");
+			public int Address_Code => AllocationAddress + HeaderSize;
+			public int Address_SafeFreeFlag => AllocationAddress + Offset_SafeFreeFlag;
+
+			public int AllocationAddress;
+			public int SafeFreeFlag;
 		}
 	}
 }

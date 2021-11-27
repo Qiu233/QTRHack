@@ -10,9 +10,29 @@ namespace QHackLib
 {
 	public class AobscanHelper
 	{
+		[StructLayout(LayoutKind.Sequential)]
+		private struct MEMORY_BASIC_INFORMATION
+		{
+			public int BaseAddress;
+			public int AllocationBase;
+			public int AllocationProtect;
+			public int RegionSize;
+			public int State;
+			public DataAccess.ProtectionType Protect;
+			public int Type;
+		}
+		[DllImport("kernel32.dll")]
+		private static extern int VirtualQueryEx
+		(
+			int hProcess,
+			int lpAddress,
+			out MEMORY_BASIC_INFORMATION lpBuffer,
+			int dwLength
+		);
+
 		public static string GetMByteCode(int i)
 		{
-			return string.Format("{0:X2}{1:X2}{2:X2}{3:X2}", i & 0xFF, (i >> 8) & 0xFF , (i >> 16) & 0xFF , (i >> 24) & 0xFF);
+			return string.Format("{0:X2}{1:X2}{2:X2}{3:X2}", i & 0xFF, (i >> 8) & 0xFF, (i >> 16) & 0xFF, (i >> 24) & 0xFF);
 		}
 		private static byte Ctoh(char hex)
 		{
@@ -100,7 +120,7 @@ namespace QHackLib
 				else if (c == '*' || i == '?')
 				{
 					if (!matching)
-						throw new Exception("Not maching mode");
+						throw new Exception("Not in maching mode");
 					match.Add(i++);
 				}
 				else
@@ -111,25 +131,24 @@ namespace QHackLib
 		private static int AobscanMatch(int handle, Dictionary<int, byte> pattern, List<int> match, int block = 0)
 		{
 			int i = block;
-			NativeFunctions.MEMORY_BASIC_INFORMATION mbi;
 			while (i < 0x7FFFFFFF)
 			{
-				int flag = NativeFunctions.VirtualQueryEx(handle, i, out mbi, 28);
+				int flag = VirtualQueryEx(handle, i, out MEMORY_BASIC_INFORMATION mbi, 28);
 				if (flag != 28)
 					break;
-				if ((int)mbi.RegionSize <= 0)
+				if (mbi.RegionSize <= 0)
 					break;
-				if (mbi.Protect != (UInt32)NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE || mbi.State != 0x00001000)
+				if (mbi.Protect != DataAccess.ProtectionType.PAGE_EXECUTE_READWRITE || mbi.State != 0x00001000)
 				{
 					i = mbi.BaseAddress + mbi.RegionSize;
 					continue;
 				}
 				byte[] va = new byte[mbi.RegionSize];
-				NativeFunctions.ReadProcessMemory(handle, mbi.BaseAddress, va, mbi.RegionSize, 0);
+				DataAccess.ReadProcessMemory(handle, mbi.BaseAddress, va, mbi.RegionSize, 0);
 				int r = MemmemMatch(va, pattern, match);
 				if (r >= 0)
 				{
-					return (int)(mbi.BaseAddress + r);
+					return mbi.BaseAddress + r;
 				}
 				i = mbi.BaseAddress + mbi.RegionSize;
 			}
@@ -172,25 +191,24 @@ namespace QHackLib
 		public static int Aobscan(int handle, byte[] aob, int blockToStart = 0)
 		{
 			int i = blockToStart;
-			NativeFunctions.MEMORY_BASIC_INFORMATION mbi;
 			while (i < 0x7FFFFFFF)
 			{
-				int flag = NativeFunctions.VirtualQueryEx(handle, i, out mbi, 28);
+				int flag = VirtualQueryEx(handle, i, out MEMORY_BASIC_INFORMATION mbi, 28);
 				if (flag != 28)
 					break;
-				if ((int)mbi.RegionSize <= 0)
+				if (mbi.RegionSize <= 0)
 					break;
-				if (mbi.Protect != (UInt32)NativeFunctions.ProtectionType.PAGE_EXECUTE_READWRITE || mbi.State != 0x00001000)
+				if (mbi.Protect != DataAccess.ProtectionType.PAGE_EXECUTE_READWRITE || mbi.State != 0x00001000)
 				{
 					i = mbi.BaseAddress + mbi.RegionSize;
 					continue;
 				}
 				byte[] va = new byte[mbi.RegionSize];
-				NativeFunctions.ReadProcessMemory(handle, mbi.BaseAddress, va, mbi.RegionSize, 0);
+				DataAccess.ReadProcessMemory(handle, mbi.BaseAddress, va, mbi.RegionSize, 0);
 				int r = Memmem(va, mbi.RegionSize, aob, aob.Length);
 				if (r >= 0)
 				{
-					return (int)(mbi.BaseAddress + r);
+					return mbi.BaseAddress + r;
 				}
 				i = mbi.BaseAddress + mbi.RegionSize;
 			}

@@ -13,6 +13,7 @@ namespace QHackLib
 {
 	public class Context : IDisposable
 	{
+		#region natives
 		[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
 		private struct LUID
 		{
@@ -41,6 +42,7 @@ namespace QHackLib
 		[return: MarshalAs(UnmanagedType.Bool)]
 		private static extern bool OpenProcessToken(IntPtr ProcessHandle, uint DesiredAccesss, out IntPtr TokenHandle);
 
+
 		[DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
 		[return: MarshalAs(UnmanagedType.Bool)]
 		private static extern bool CloseHandle(IntPtr hObject);
@@ -53,72 +55,48 @@ namespace QHackLib
 		[return: MarshalAs(UnmanagedType.Bool)]
 		private static extern bool AdjustTokenPrivileges(IntPtr TokenHandle, [MarshalAs(UnmanagedType.Bool)] bool DisableAllPrivileges, [MarshalAs(UnmanagedType.Struct)] ref TOKEN_PRIVILEGES NewState, uint BufferLength, IntPtr PreviousState, uint ReturnLength);
 
-
-
-		private const uint TOKEN_QUERY = 0x0008;
-		private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
-		private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
-
-		private static void GrantPrivilege()
-		{
-			bool flag;
-			LUID locallyUniqueIdentifier = new LUID();
-			flag = LookupPrivilegeValue(null, "SeDebugPrivilege", ref locallyUniqueIdentifier);
-			TOKEN_PRIVILEGES tokenPrivileges = new TOKEN_PRIVILEGES();
-			tokenPrivileges.PrivilegeCount = 1;
-
-			LUID_AND_ATTRIBUTES luidAndAtt = new LUID_AND_ATTRIBUTES();
-			// luidAndAtt.Attributes should be SE_PRIVILEGE_ENABLED to enable privilege
-			luidAndAtt.Attributes = SE_PRIVILEGE_ENABLED;
-			luidAndAtt.Luid = locallyUniqueIdentifier;
-			tokenPrivileges.Privilege = luidAndAtt;
-
-			IntPtr tokenHandle = IntPtr.Zero;
-			flag = OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, out tokenHandle);
-			flag = AdjustTokenPrivileges(tokenHandle, false, ref tokenPrivileges, 1024, IntPtr.Zero, 0);
-			flag = CloseHandle(tokenHandle);
-		}
-
 		[DllImport("kernel32.dll")]
 		private static extern int OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 		[DllImport("kernel32.dll")]
 		private static extern int CloseHandle(int dwDesiredAccess);
-
 		private const int PROCESS_ALL_ACCESS = 0x1F0FFF;
+		private const uint TOKEN_QUERY = 0x0008;
+		private const uint TOKEN_ADJUST_PRIVILEGES = 0x0020;
+		private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
+		#endregion
 
-		public string ProcessName
+		private static void GrantPrivilege()
 		{
-			get;
-		}
-		public int ProcessID
-		{
-			get;
-		}
-		public int Handle
-		{
-			get;
+			LUID locallyUniqueIdentifier = new LUID();
+			LookupPrivilegeValue(null, "SeDebugPrivilege", ref locallyUniqueIdentifier);
+			TOKEN_PRIVILEGES tokenPrivileges = new TOKEN_PRIVILEGES
+			{
+				PrivilegeCount = 1
+			};
+
+			LUID_AND_ATTRIBUTES luidAndAtt = new LUID_AND_ATTRIBUTES
+			{
+				Attributes = SE_PRIVILEGE_ENABLED,
+				Luid = locallyUniqueIdentifier
+			};
+			tokenPrivileges.Privilege = luidAndAtt;
+
+			OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, out IntPtr tokenHandle);
+			AdjustTokenPrivileges(tokenHandle, false, ref tokenPrivileges, 1024, IntPtr.Zero, 0);
+			CloseHandle(tokenHandle);
 		}
 
-		public DataTarget DataTarget
-		{
-			get;
-		}
-		public ClrRuntime Runtime
-		{
-			get;
-		}
-		public AddressHelper MainAddressHelper
-		{
-			get;
-		}
-		public AddressHelper[] AddressHelpers
-		{
-			get;
-		}
-		private Dictionary<string, AddressHelper> NameToAddressHelper
-		{
-			get;
-		}
+		public string ProcessName { get; }
+		public int ProcessID { get; }
+		public int Handle { get; }
+
+		public DataTarget DataTarget { get; }
+		public ClrRuntime Runtime { get; }
+		public AddressHelper MainAddressHelper { get; }
+		public AddressHelper MSCORLIBAddressHelper { get; }
+		public AddressHelper[] AddressHelpers { get; }
+		private Dictionary<string, AddressHelper> NameToAddressHelper { get; }
+		public DataAccess DataAccess => new DataAccess(Handle);
 
 
 		private void LoadAllAddressHelpers()
@@ -136,12 +114,12 @@ namespace QHackLib
 			DataTarget = DataTarget.AttachToProcess(id, false);
 			Runtime = DataTarget.ClrVersions[0].CreateRuntime();
 
-
 			AddressHelpers = new AddressHelper[Runtime.AppDomains[0].Modules.Length];
 			NameToAddressHelper = new Dictionary<string, AddressHelper>();
 			LoadAllAddressHelpers();
 
 			MainAddressHelper = GetAddressHelper(moduleName);//这句必须最后执行，因为需要用到Context里面的一点信息
+			MSCORLIBAddressHelper = GetAddressHelper("mscorlib.dll");
 		}
 
 		public AddressHelper GetAddressHelper(string ModuleName)
@@ -170,15 +148,9 @@ namespace QHackLib
 			return new Context(process.ProcessName, processID, OpenProcess(PROCESS_ALL_ACCESS, false, processID), process.ProcessName + ".exe");
 		}
 
-		public void Close()
-		{
-			DataTarget.Dispose();
-			CloseHandle(Handle);
-		}
-
 		public void Dispose()
 		{
-			Close();
+			DataTarget.Dispose();
 		}
 	}
 }

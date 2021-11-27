@@ -60,6 +60,10 @@ namespace QTRHack.Kernel
 		{
 			return GetStaticMethod(typeName, t => t.Signature == sig);
 		}
+		public GameMethodCall GetStaticMethodByName(string typeName, string name)
+		{
+			return GetStaticMethod(typeName, t => t.Name == name);
+		}
 
 		public static GameContext OpenGame(Process process)
 		{

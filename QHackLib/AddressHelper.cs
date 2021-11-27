@@ -27,62 +27,109 @@ namespace QHackLib
 			Module = module;
 			Context = ctx;
 		}
-		public ClrType GetClrType(string TypeName) => Module.GetTypeByName(TypeName);
-		public ClrMethod GetClrMethod(string TypeName, string MethodName) => GetClrType(TypeName).Methods.First(t => t.Name == MethodName);
+		public ClrType GetClrType(string TypeName)
+		{
+			ClrType type = Module.GetTypeByName(TypeName);
+			if (type is null)
+				throw MakeArgNotFoundException<ClrType>("TypeName", TypeName);
+			return type;
+		}
+
+		public ClrMethod GetClrMethod(string TypeName, string MethodName)
+		{
+			ClrMethod[] methods = GetClrType(TypeName).Methods.Where(t => t.Name == MethodName).ToArray();
+			if (methods.Length == 0)
+				throw MakeArgNotFoundException<ClrMethod>("MethodName", MethodName);
+			return methods[0];
+		}
+
 		public ClrMethod GetClrMethod(string TypeName, Func<ClrMethod, bool> filter) => GetClrType(TypeName).Methods.First(t => filter(t));
-		public int GetFunctionAddress(string TypeName, string FunctionName) => (int)GetClrType(TypeName).Methods.First(t => t.Name == FunctionName).NativeCode;
-		public int GetFunctionAddress(string TypeName, Func<ClrMethod, bool> filter) => (int)GetClrType(TypeName).Methods.First(t => filter(t)).NativeCode;
+
+		public int GetFunctionAddress(string TypeName, string FunctionName) => (int)GetClrMethod(TypeName, FunctionName).NativeCode;
+		public int GetFunctionAddress(string TypeName, Func<ClrMethod, bool> filter) => (int)GetClrMethod(TypeName, t => filter(t)).NativeCode;
+
 		public ILToNativeMap GetFunctionInstruction(string TypeName, string FunctionName, int ILOffset) => GetClrType(TypeName).Methods.First(t => t.Name == FunctionName).ILOffsetMap.First(t => t.ILOffset == ILOffset);
-		public int GetStaticFieldAddress(string TypeName, string FieldName) => (int)GetClrType(TypeName).GetStaticFieldByName(FieldName).GetAddress(Module.AppDomain);
-		public int GetFieldOffset(string TypeName, string FieldName) => GetClrType(TypeName).Fields.First(t => t.Name == FieldName).Offset + 4;//+4 to get true offset
 
-		public T GetStaticFieldValue<T>(string TypeName, string FieldName) where T : struct
+		public int GetStaticFieldAddress(string TypeName, string FieldName)
 		{
-			var t = GetClrType(TypeName);
-			int len = ValueTypeMeasurer.Measure<T>();
-			byte[] bs = new byte[len];
-			NativeFunctions.ReadProcessMemory(Context.Handle, (int)t.GetStaticFieldByName(FieldName).GetAddress(Module.AppDomain), bs, len, 0);
-			IntPtr ptr = Marshal.AllocHGlobal(len);
-			Marshal.Copy(bs, 0, ptr, len);
-			T result = Marshal.PtrToStructure<T>(ptr);
-			Marshal.FreeHGlobal(ptr);
-			return result;
-		}
-		public void SetStaticFieldValue<T>(string TypeName, string FieldName, T v) where T : struct
-		{
-			var t = GetClrType(TypeName);
-			int len = ValueTypeMeasurer.Measure<T>();
-			byte[] bs = new byte[len];
-			IntPtr ptr = Marshal.AllocHGlobal(len);
-			Marshal.StructureToPtr(v, ptr, false);
-			Marshal.Copy(ptr, bs, 0, len);
-			NativeFunctions.WriteProcessMemory(Context.Handle, (int)t.GetStaticFieldByName(FieldName).GetAddress(Module.AppDomain), bs, len, 0);
-			Marshal.FreeHGlobal(ptr);
+			ClrStaticField field = GetClrType(TypeName).GetStaticFieldByName(FieldName);
+			if (field is null)
+				throw MakeArgNotFoundException<ClrStaticField>("FieldName", FieldName);
+			return (int)field.GetAddress(Module.AppDomain);
 		}
 
-		public T GetInstanceFieldValue<T>(string TypeName, string FieldName, int obj) where T : struct
+		public int GetFieldOffset(string TypeName, string FieldName)
 		{
-			var t = GetClrType(TypeName);
-			int len = ValueTypeMeasurer.Measure<T>();
-			byte[] bs = new byte[len];
-			NativeFunctions.ReadProcessMemory(Context.Handle, obj + t.GetFieldByName(FieldName).Offset + 4, bs, len, 0);
-			IntPtr ptr = Marshal.AllocHGlobal(len);
-			Marshal.Copy(bs, 0, ptr, len);
-			T result = Marshal.PtrToStructure<T>(ptr);
-			Marshal.FreeHGlobal(ptr);
-			return result;
+			ClrInstanceField field = GetClrType(TypeName).GetFieldByName(FieldName);
+			if (field is null)
+				throw MakeArgNotFoundException<ClrInstanceField>("FieldName", FieldName);
+			return field.Offset + 4;//+4 to get true offset
 		}
 
-		public void SetInstanceFieldValue<T>(string TypeName, string FieldName, int obj, T v) where T : struct
+		public T GetStaticFieldValue<T>(string TypeName, string FieldName) where T : unmanaged
 		{
-			var t = GetClrType(TypeName);
-			int len = ValueTypeMeasurer.Measure<T>();
-			byte[] bs = new byte[len];
-			IntPtr ptr = Marshal.AllocHGlobal(len);
-			Marshal.StructureToPtr(v, ptr, false);
-			Marshal.Copy(ptr, bs, 0, len);
-			NativeFunctions.WriteProcessMemory(Context.Handle, obj + t.GetFieldByName(FieldName).Offset + 4, bs, len, 0);
-			Marshal.FreeHGlobal(ptr);
+			ClrStaticField field = GetClrType(TypeName).GetStaticFieldByName(FieldName);
+			if (field is null)
+				throw MakeArgNotFoundException<ClrStaticField>("FieldName", FieldName);
+			return Context.DataAccess.Read<T>((int)field.GetAddress(Module.AppDomain));
+		}
+		public void SetStaticFieldValue<T>(string TypeName, string FieldName, T value) where T : unmanaged
+		{
+			ClrStaticField field = GetClrType(TypeName).GetStaticFieldByName(FieldName);
+			if (field is null)
+				throw MakeArgNotFoundException<ClrStaticField>("FieldName", FieldName);
+			Context.DataAccess.Write((int)field.GetAddress(Module.AppDomain), value);
+		}
+
+		public T GetInstanceFieldValue<T>(string TypeName, string FieldName, int obj) where T : unmanaged
+		{
+			ClrInstanceField field = GetClrType(TypeName).GetFieldByName(FieldName);
+			if (field is null)
+				throw MakeArgNotFoundException<ClrInstanceField>("FieldName", FieldName);
+			return Context.DataAccess.Read<T>((int)field.GetAddress((ulong)obj));
+		}
+
+		public void SetInstanceFieldValue<T>(string TypeName, string FieldName, int obj, T value) where T : unmanaged
+		{
+			ClrInstanceField field = GetClrType(TypeName).GetFieldByName(FieldName);
+			if (field is null)
+				throw MakeArgNotFoundException<ClrInstanceField>("FieldName", FieldName);
+			Context.DataAccess.Write<T>((int)field.GetAddress((ulong)obj), value);
+		}
+
+		private Exception MakeArgNotFoundException<T>(string fieldName, string fieldValue)
+		{
+			Type type = typeof(T);
+			if (type.IsSubclassOf(typeof(ClrType)))
+				return new ClrTypeNotFoundException($"No such type found: {fieldValue}", fieldName);
+			else if (type.IsSubclassOf(typeof(ClrStaticField)))
+				return new ClrTypeNotFoundException($"No such static field found: {fieldValue}", fieldName);
+			else if (type.IsSubclassOf(typeof(ClrInstanceField)))
+				return new ClrTypeNotFoundException($"No such static field found: {fieldValue}", fieldName);
+			else if (type.IsSubclassOf(typeof(ClrMethod)))
+				return new ClrTypeNotFoundException($"No such method found: {fieldValue}", fieldName);
+			return new ArgumentException($"No such {typeof(T).Name} found", fieldName);
+		}
+
+		internal class ClrTypeNotFoundException : ArgumentException
+		{
+			public ClrTypeNotFoundException(string msg, string param) : base(msg, param) { }
+		}
+		internal class ClrMethodNotFoundException : ArgumentException
+		{
+			public ClrMethodNotFoundException(string msg, string param) : base(msg, param) { }
+		}
+		internal abstract class ClrFieldNotFoundException : ArgumentException
+		{
+			public ClrFieldNotFoundException(string msg, string param) : base(msg, param) { }
+		}
+		internal class ClrStaticFieldNotFoundException : ClrFieldNotFoundException
+		{
+			public ClrStaticFieldNotFoundException(string msg, string param) : base(msg, param) { }
+		}
+		internal class ClrInstanceFieldNotFoundException : ClrFieldNotFoundException
+		{
+			public ClrInstanceFieldNotFoundException(string msg, string param) : base(msg, param) { }
 		}
 	}
 }

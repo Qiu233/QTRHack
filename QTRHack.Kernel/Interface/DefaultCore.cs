@@ -1,16 +1,13 @@
-﻿using QHackLib;
-using QTRHack.Kernel;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Core
+namespace QTRHack.Kernel.Interface
 {
 	/// <summary>
-	/// <para>Do not inherit this if the core is for OTHER types of game than TML and VNL</para>
+	/// <para>Do not inherit this class if the core is for OTHER types of game rather than TML and VNL</para>
 	/// <para>Instead you should verify the game instance by overriding the method MatchGame of class BaseCore</para>
 	/// </summary>
 	public abstract class DefaultCore : BaseCore
@@ -31,8 +28,7 @@ namespace QTRHack.Core
 
 			if (gameVersion.CompareTo(GameContext.GameAssemblyName.Version) != 0)
 				return false;
-
-			bool TML = GameContext.ProcessContext.MainAddressHelper.GetClrType("Terraria.ModLoader.ModLoader") != null;
+			bool TML = GameContext.ProcessContext.MainAddressHelper.Module.GetTypeByName("Terraria.ModLoader.ModLoader") != null;
 			return (gameType == GameType.TML && TML) || (!TML && gameType == GameType.VNL);
 		}
 	}

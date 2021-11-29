@@ -4,12 +4,18 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Kernel
+namespace QTRHack.Kernel.Interface
 {
 	public enum GameType
 	{
 		NONE = 0,
+		/// <summary>
+		/// vanilla
+		/// </summary>
 		VNL,
+		/// <summary>
+		/// tModLoader
+		/// </summary>
 		TML,
 		OTHER,
 	}
@@ -57,6 +63,37 @@ namespace QTRHack.Kernel
 		{
 			TryParse(value, out CoreVersionSig sig);
 			return sig;
+		}
+
+		public static bool operator ==(CoreVersionSig a, CoreVersionSig b)
+		{
+			if (a is null)
+				return b is null;
+			return a.Equals(b);
+		}
+		public static bool operator !=(CoreVersionSig a, CoreVersionSig b)
+		{
+			return !(a == b);
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (obj is null)
+				return false;
+			if (!(obj is CoreVersionSig))
+				return false;
+			if (GetHashCode() == obj.GetHashCode())
+				return true;
+			return base.Equals(obj);
+		}
+
+		public override int GetHashCode()
+		{
+			int hashCode = -1116190013;
+			hashCode = hashCode * -1521134295 + GameType.GetHashCode();
+			hashCode = hashCode * -1521134295 + EqualityComparer<Version>.Default.GetHashCode(GameVersion);
+			hashCode = hashCode * -1521134295 + Build.GetHashCode();
+			return hashCode;
 		}
 	}
 }

@@ -44,7 +44,7 @@ namespace QHackLib.FunctionHelper
 			Header = new RemoteExecutionHeader
 			{
 				AllocationAddress = Context.DataAccess.AllocMemory(),
-				SafeFreeFlag = 1//normally 1, which ensures the code will run at lease once before get released
+				SafeFreeFlag = 1
 			};
 
 			Assembler assembler = new Assembler(Header.AllocationAddress);
@@ -57,8 +57,8 @@ namespace QHackLib.FunctionHelper
 		}
 
 		/// <summary>
-		/// <para>Allocates space and fills the code in before calling <see cref="RemoteExecution.RunOnNativeThread"/> to start a remote native thread.</para>
-		/// <para>To avoid a memory leak, call <see cref="RemoteExecution.Dispose"/> to release the allocated space when the thread is not running.</para>
+		/// Allocates space and fills the code in before calling <see cref="RemoteExecution.RunOnNativeThread"/> to start a remote native thread.<br/>
+		/// To avoid a memory leak, call <see cref="RemoteExecution.Dispose"/> to release the allocated space when the thread is not running.
 		/// </summary>
 		/// <param name="ctx"></param>
 		/// <param name="asm"></param>
@@ -70,7 +70,7 @@ namespace QHackLib.FunctionHelper
 
 		/// <summary>
 		/// Directly starts a remote native thread.<br/>
-		/// Note that native threads have no clr info and hence cannot do such things like allocate space on clr's heaps.
+		/// Note that native threads have no clr info and hence cannot do such things like allocating space on clr heaps.
 		/// </summary>
 		/// <returns>ThreadID of the remote thread created</returns>
 		public int RunOnNativeThread()
@@ -90,7 +90,8 @@ namespace QHackLib.FunctionHelper
 		}
 
 		/// <summary>
-		/// Calling this method will wait till the SafeFreeFlag become 0 before releasing the memory.<br/>
+		/// Calling this method will wait until the SafeFreeFlag become 0 before releasing the memory,<br/>
+		/// which ensures that the code will be executed at least once.
 		/// </summary>
 		public void Dispose()
 		{

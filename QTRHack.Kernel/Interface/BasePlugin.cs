@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Kernel
+namespace QTRHack.Kernel.Interface
 {
 	public abstract class BasePlugin
 	{

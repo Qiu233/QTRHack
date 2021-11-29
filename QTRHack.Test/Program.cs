@@ -3,6 +3,7 @@ using QHackLib;
 using QHackLib.Assemble;
 using QHackLib.FunctionHelper;
 using QTRHack.Kernel;
+using QTRHack.Kernel.Interface.GameData.Content;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -21,27 +22,17 @@ namespace QTRHack.Test
 		{
 			using (HackKernel kernel = HackKernel.Create(Process.GetProcessesByName("Terraria")[0]))
 			{
-				int handle = kernel.GameContext.ProcessContext.Handle;
-				dynamic plr = kernel.GameContext.GetStaticGameObject("Terraria.Main", "player")[0];
-				dynamic pos = plr.position;
-				AssemblyCode code = AssemblySnippet.FromCode(new AssemblyCode[] {
-					//kernel.GameContext.GetStaticMethodByName("Terraria.NPC","NewNPC").Call(true,null,(int)(float)pos.X,(int)(float)pos.Y,50,0,0f,0f,0f,0f,255),
-					plr.inventory[0].SetDefaults("Terraria.Item.SetDefaults(Int32)").Call(true,null,3063),
-				});
-
-				RemoteExecution re = RemoteExecution.Create(kernel.GameContext.ProcessContext, code);
-				int addr_type_str = kernel.GameContext.ProcessContext.DataAccess.NewWCHARArray("System.Action");
-
-				InlineHook.InjectAndWait(
-					kernel.GameContext.ProcessContext,
-					AssemblySnippet.StartManagedThread(
-						kernel.GameContext.ProcessContext,
-						re.CodeAddress,
-						addr_type_str),
-					kernel.GameContext.GameAddressHelper.
-					GetFunctionAddress("Terraria.Main", "DoUpdate"), true);
-				kernel.GameContext.ProcessContext.DataAccess.FreeMemory(addr_type_str);
-				re.Dispose();
+				/*dynamic plr = kernel.GameContext.GetStaticGameObject("Terraria.Main", "player")[0];
+				AssemblyCode code = plr.inventory[0].SetDefaults("Terraria.Item.SetDefaults(Int32)").Call(true, null, 3063);
+				kernel.GameContext.RunOnManagedThread(code).Dispose();*/
+				var item = kernel.GameContext.GetStaticGameObject("Terraria.Main", "player")[0].inventory[0];
+				int life = kernel.RequestGD<BaseItemAccess.ItemAccessArgs, int>(
+					"Type",
+					new BaseItemAccess.ItemAccessArgs(kernel.GameContext)
+					{
+						Item = item
+					});
+				Console.WriteLine(life);
 			}
 		}
 	}

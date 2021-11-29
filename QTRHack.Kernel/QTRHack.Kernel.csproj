@@ -17,7 +17,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
+    <OutputPath>..\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -26,7 +26,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -50,6 +50,7 @@
       <HintPath>..\packages\System.Collections.Immutable.5.0.0\lib\net461\System.Collections.Immutable.dll</HintPath>
     </Reference>
     <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
     </Reference>
@@ -74,12 +75,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BaseCore.cs" />
-    <Compile Include="BasePlugin.cs" />
-    <Compile Include="CoreVersionSig.cs" />
+    <Compile Include="Interface\BaseCore.cs" />
+    <Compile Include="Interface\BasePlugin.cs" />
+    <Compile Include="Interface\CoreVersionSig.cs" />
+    <Compile Include="Interface\DefaultCore.cs" />
     <Compile Include="GameContext.cs" />
     <Compile Include="HackKernel.cs" />
     <Compile Include="HackKernelException.cs" />
+    <Compile Include="Interface\GameData\Content\BaseItemAccess.cs" />
+    <Compile Include="Interface\GameData\Content\BasePlayerAccess.cs" />
+    <Compile Include="Interface\GameData\GDAccess.cs" />
+    <Compile Include="Interface\GameData\GDAccessArgs.cs" />
+    <Compile Include="Interface\GameData\GDRequest.cs" />
+    <Compile Include="Interface\GameData\IGameDataProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -70,9 +70,9 @@ namespace QHackLib.FunctionHelper
 			return v;
 		}
 
-		public static void InjectAndWait(Context Context, AssemblyCode snippet, int targetAddr, bool once)
+		public static void HookAndWait(Context Context, AssemblyCode code, int targetAddr, bool once)
 		{
-			HookInfo hookInfo = Inject(Context, snippet, targetAddr, once);
+			HookInfo hookInfo = Hook(Context, code, targetAddr, once);
 			System.Threading.Thread.Sleep(10);
 			int sffAddr = hookInfo.Address_SafeFreeFlag;
 			int ofAddr = hookInfo.Address_OnceFlag;
@@ -148,7 +148,7 @@ namespace QHackLib.FunctionHelper
 		/// <param name="execRaw"></param>
 		/// <param name="size"></param>
 		/// <returns></returns>
-		public static HookInfo Inject(Context Context, AssemblyCode code, int targetAddr, bool once, bool execRaw = true, int size = 1024)
+		public static HookInfo Hook(Context Context, AssemblyCode code, int targetAddr, bool once, bool execRaw = true, int size = 1024)
 		{
 			byte[] headInstBytes = GetHeadBytes(Context.DataAccess.ReadBytes(targetAddr, 32));
 

@@ -131,7 +131,7 @@ namespace QHackLib
 				if (t == null || t.Module == null || t.Module.Name == null)
 					return false;
 				return t.Module.Name.Contains("\\") ? Path.GetFileName(t.Module.Name) == ModuleName :
-				t.Module.Name == "dynamic" ? false : t.Module.Name.Substring(0, t.Module.Name.IndexOf(",")) == Path.GetFileNameWithoutExtension(ModuleName);
+				t.Module.Name != "dynamic" && t.Module.Name.Substring(0, t.Module.Name.IndexOf(",")) == Path.GetFileNameWithoutExtension(ModuleName);
 			});
 			NameToAddressHelper[ModuleName] = m;
 			return m;

@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace QTRHack.Core.VNL_1353
 {
-	public class Core : DefaultCore
+	public class Core : BaseCore
 	{
-		public Core(GameContext ctx) : base(ctx)
+		public Core() : base()
 		{
 		}
 
@@ -22,8 +22,9 @@ namespace QTRHack.Core.VNL_1353
 		public override IGameDataProvider GameDataProvider => new GameDataProvider();
 
 
-		public override void Initialize()
+		public override void Initialize(GameContext ctx)
 		{
+			base.Initialize(ctx);
 		}
 
 	}

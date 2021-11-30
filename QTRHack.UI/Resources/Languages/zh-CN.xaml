@@ -1,0 +1,10 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:clr="clr-namespace:System;assembly=mscorlib">
+    <clr:String x:Key="Localization.Control.CONFIRM">确定</clr:String>
+    <clr:String x:Key="Localization.Control.RESET">重置</clr:String>
+    <clr:String x:Key="Localization.Control.GAME_VERSION">游戏版本</clr:String>
+    <clr:String x:Key="Localization.Control.DRAG_CROSS">拖动右侧十字到游戏窗口</clr:String>
+    <clr:String x:Key="Localization.Control.SELECT_CORE">在左侧选择Core版本</clr:String>
+    <clr:String x:Key="Localization.Control.STARTUP_CLICK_CONFIRM">点击确定开始使用</clr:String>
+</ResourceDictionary>

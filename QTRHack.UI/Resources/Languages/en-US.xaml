@@ -1,0 +1,10 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:clr="clr-namespace:System;assembly=mscorlib">
+    <clr:String x:Key="Localization.Control.CONFIRM">Confirm</clr:String>
+    <clr:String x:Key="Localization.Control.RESET">Reset</clr:String>
+    <clr:String x:Key="Localization.Control.GAME_VERSION">Game Version</clr:String>
+    <clr:String x:Key="Localization.Control.DRAG_CROSS">Drag the cross on the right side to game window</clr:String>
+    <clr:String x:Key="Localization.Control.SELECT_CORE">Select a core version on the left side</clr:String>
+    <clr:String x:Key="Localization.Control.STARTUP_CLICK_CONFIRM">Click Confirm to start</clr:String>
+</ResourceDictionary>

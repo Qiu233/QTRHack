@@ -1,0 +1,27 @@
+﻿<mah:MetroWindow 
+    x:Class="QTRHack.UI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:mah="http://metro.mahapps.com/winfx/xaml/controls"
+    xmlns:local="clr-namespace:QTRHack.UI"
+    mc:Ignorable="d"
+    Title="QTRHack" Height="450"
+    ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+    MaxWidth="600"
+    MinWidth="500"
+    DataContext="{Binding RelativeSource={RelativeSource Self}}"
+    SizeToContent="Width">
+
+    <mah:MetroWindow.Resources>
+    </mah:MetroWindow.Resources>
+    <StackPanel Orientation="Horizontal" CanHorizontallyScroll="True">
+        <TabControl >
+            <TabItem Header="Player">
+                <ListView x:Name="playerList" DataContext="{Binding PlayerCollection}">
+                </ListView>
+            </TabItem>
+        </TabControl>
+    </StackPanel>
+</mah:MetroWindow>

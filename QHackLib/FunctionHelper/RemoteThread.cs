@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace QHackLib.FunctionHelper
 {
-	public unsafe class RemoteExecution : IDisposable
+	public unsafe sealed class RemoteThread : IDisposable
 	{
 		[DllImport("kernel32.dll")]
 		internal static extern IntPtr CreateRemoteThread(
@@ -20,7 +20,7 @@ namespace QHackLib.FunctionHelper
 			int dwCreationFlags,
 			out int lpThreadId
 		);
-		private readonly RemoteExecutionHeader Header;
+		private readonly RemoteThreadHeader Header;
 
 		/// <summary>
 		/// Indicates whether the code memory can be safely released.<br/>
@@ -38,10 +38,10 @@ namespace QHackLib.FunctionHelper
 			get;
 			private set;
 		}
-		private RemoteExecution(Context ctx, AssemblyCode asm)
+		private RemoteThread(Context ctx, AssemblyCode asm)
 		{
 			Context = ctx;
-			Header = new RemoteExecutionHeader
+			Header = new RemoteThreadHeader
 			{
 				AllocationAddress = Context.DataAccess.AllocMemory(),
 				SafeFreeFlag = 1
@@ -57,15 +57,15 @@ namespace QHackLib.FunctionHelper
 		}
 
 		/// <summary>
-		/// Allocates space and fills the code in before calling <see cref="RemoteExecution.RunOnNativeThread"/> to start a remote native thread.<br/>
-		/// To avoid a memory leak, call <see cref="RemoteExecution.Dispose"/> to release the allocated space when the thread is not running.
+		/// Allocates space and fills the code in before calling <see cref="RemoteThread.RunOnNativeThread"/> to start a remote native thread.<br/>
+		/// To avoid a memory leak, call <see cref="RemoteThread.Dispose"/> to release the allocated space when the thread is not running.
 		/// </summary>
 		/// <param name="ctx"></param>
 		/// <param name="asm"></param>
 		/// <returns></returns>
-		public static RemoteExecution Create(Context ctx, AssemblyCode asm)
+		public static RemoteThread Create(Context ctx, AssemblyCode asm)
 		{
-			return new RemoteExecution(ctx, asm);
+			return new RemoteThread(ctx, asm);
 		}
 
 		/// <summary>
@@ -101,10 +101,10 @@ namespace QHackLib.FunctionHelper
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		private struct RemoteExecutionHeader
+		private struct RemoteThreadHeader
 		{
-			public static readonly int HeaderSize = sizeof(RemoteExecutionHeader);
-			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<RemoteExecutionHeader>("SafeFreeFlag");
+			public static readonly int HeaderSize = sizeof(RemoteThreadHeader);
+			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<RemoteThreadHeader>("SafeFreeFlag");
 			public int Address_Code => AllocationAddress + HeaderSize;
 			public int Address_SafeFreeFlag => AllocationAddress + Offset_SafeFreeFlag;
 

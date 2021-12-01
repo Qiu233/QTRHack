@@ -11,74 +11,74 @@ namespace QHackLib
 	/// <summary>
 	/// A wrapper for game method
 	/// </summary>
-	public class GameMethod : IEquatable<GameMethod>
+	public sealed class HackMethod : IEquatable<HackMethod>
 	{
 		public Context Context { get; }
-		public ClrMethod Method { get; }
+		public ClrMethod InternalClrMethod { get; }
 
-		public GameMethod(Context context, ClrMethod method)
+		public HackMethod(Context context, ClrMethod method)
 		{
 			Context = context;
-			Method = method;
+			InternalClrMethod = method;
 		}
 
 		public AssemblyCode Call(bool regProtection, int? thisPtr, int? retBuf, params object[] args)
 		{
-			return AssemblySnippet.FromClrCall((int)Method.NativeCode, regProtection, thisPtr, retBuf, args);
+			return AssemblySnippet.FromClrCall((int)InternalClrMethod.NativeCode, regProtection, thisPtr, retBuf, args);
 		}
 		public AssemblyCode Call(bool regProtection, IAddressableTypedEntity entity, int? retBuf, params object[] args)
 		{
 			return Call(regProtection, (int)entity.Address, retBuf, args);
 		}
-		public GameMethodCall Call(int? thisPtr)
+		public HackMethodCall Call(int? thisPtr)
 		{
-			return new GameMethodCall(this, thisPtr);
+			return new HackMethodCall(this, thisPtr);
 		}
-		public GameMethodCall Call(IAddressableTypedEntity entity)
+		public HackMethodCall Call(IAddressableTypedEntity entity)
 		{
-			return new GameMethodCall(this, entity);
+			return new HackMethodCall(this, entity);
 		}
 
 		public override bool Equals(object obj)
 		{
-			return Equals(obj as GameMethod);
+			return Equals(obj as HackMethod);
 		}
 		public override int GetHashCode()
 		{
-			return Method.GetHashCode();
+			return InternalClrMethod.GetHashCode();
 		}
 
-		public bool Equals(GameMethod other)
+		public bool Equals(HackMethod other)
 		{
-			return Method.Equals(other?.Method);
+			return InternalClrMethod.Equals(other?.InternalClrMethod);
 		}
 
-		public static bool operator ==(GameMethod a, GameMethod b)
+		public static bool operator ==(HackMethod a, HackMethod b)
 		{
 			if (a == null)
 				return b == null;
 			return a.Equals(b);
 		}
-		public static bool operator !=(GameMethod a, GameMethod b)
+		public static bool operator !=(HackMethod a, HackMethod b)
 		{
 			return !(a == b);
 		}
 	}
 
 	/// <summary>
-	/// 
+	/// Represents a call to a HackMethod.
 	/// </summary>
-	public class GameMethodCall
+	public class HackMethodCall
 	{
-		public GameMethod Method { get; }
+		public HackMethod Method { get; }
 		public int? ThisPointer { get; }
 
-		public GameMethodCall(GameMethod method, int? thisPointer)
+		public HackMethodCall(HackMethod method, int? thisPointer)
 		{
 			Method = method;
 			ThisPointer = thisPointer;
 		}
-		public GameMethodCall(GameMethod method, IAddressableTypedEntity entity)
+		public HackMethodCall(HackMethod method, IAddressableTypedEntity entity)
 		{
 			Method = method;
 			ThisPointer = (int)entity.Address;

@@ -29,8 +29,6 @@ namespace QTRHack.UI
 		private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
 		private readonly Grid ContentGrid, MainGrid;
 		private static readonly string[] Languages = new string[] { "en-US", "zh-CN" };
-		private const string DIR_CORES = "./Cores/";
-		private readonly Dictionary<string, BaseCore> Cores = new Dictionary<string, BaseCore>();
 		private readonly Button ConfirmButton, ResetButton;
 		private readonly ListView CoresList;
 		private readonly StatusBarItem StatusItem;
@@ -72,6 +70,9 @@ namespace QTRHack.UI
 				BorderThickness = new Thickness(1),
 				SelectionMode = SelectionMode.Single,
 				BorderBrush = BorderBrush,
+#if DEBUG
+				SelectedIndex = 1
+#endif
 			};
 			CoresList.SelectionChanged += (s, a) =>
 			{
@@ -138,16 +139,37 @@ namespace QTRHack.UI
 			};
 			ConfirmButton.Click += (s, e) =>
 			{
-				HackKernel hackKernel = HackKernel.Create(Process.GetProcessById(PID));
-				MainWindow m = new MainWindow(hackKernel);
-				Close();
+				HackContext.HackKernel = HackKernel.Create(Process.GetProcessById(PID));
+				HackContext.HackKernel.SetCore(BaseCore.GetCore(HackContext.HackKernel.GameContext, CoresList.SelectedItem as string));
+				MainWindow m = new MainWindow();
 				m.Show();
+				Close();
 			};
 			ConfirmButton.SetResourceReference(ContentProperty, "Localization.Control.CONFIRM");
 			rightGrid.Children.Add(ConfirmButton);
 			Grid.SetRow(ConfirmButton, 3);
 
 			LoadCores();
+		}
+
+		protected override void OnContentRendered(EventArgs e)
+		{
+			base.OnContentRendered(e);
+#if DEBUG
+			{
+				Process[] ps = Process.GetProcessesByName("Terraria");
+				if (ps.Length == 0)
+				{
+					MessageBox.Show("Please start Terraria.exe at first");
+					Environment.Exit(0);
+				}
+				HackContext.HackKernel = HackKernel.Create(ps[0]);
+				HackContext.HackKernel.SetCore(BaseCore.GetCore(HackContext.HackKernel.GameContext, "VNL-1.4.3.2-0"));
+				MainWindow m = new MainWindow();
+				m.Show();
+				Close();
+			}
+#endif
 		}
 
 		private void ResetButton_Click(object sender, RoutedEventArgs e)
@@ -195,24 +217,14 @@ namespace QTRHack.UI
 
 		private void LoadCores()
 		{
-			Cores.Clear();
-			foreach (var file in Directory.EnumerateFiles(DIR_CORES, "*.dll"))
+			Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies().Where(
+				t => t.GetCustomAttributes<CoreAttribute>().Count() != 0).ToArray();
+			foreach (Assembly asm in assemblies)
 			{
-				Assembly asm = Assembly.LoadFrom(file);
-				TypeInfo[] ts = asm.DefinedTypes.Where(t => t.IsSubclassOf(typeof(BaseCore))).ToArray();
-				if (ts.Length == 0)
-					throw new HackKernelException($"Cannot find Core class. Assembly: {asm.FullName}");
-				else if (ts.Length > 1)
-					throw new HackKernelException($"More than 1 Core class found. Assembly: {asm.FullName}");
-				BaseCore core = ts[0].GetConstructor(Type.EmptyTypes).
-					Invoke(null) as BaseCore;//construct
-				Cores[core.VersionSig.ToString()] = core;
+				CoreAttribute attr = asm.GetCustomAttribute<CoreAttribute>();
+				CoresList.Items.Add(attr.CoreVersionSig);
 			}
 			CoresList.Items.Clear();
-			foreach (var coreSig in Cores.Keys)
-			{
-				CoresList.Items.Add(coreSig);
-			}
 		}
 
 		private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -224,6 +236,8 @@ namespace QTRHack.UI
 		[STAThread]
 		public static void Main()
 		{
+			foreach (string file in Directory.EnumerateFiles(HackContext.PATH_CORES, "*.dll"))
+				Assembly.LoadFrom(file);
 			Application app = new Application();
 			app.Resources.MergedDictionaries.Add(
 				new ResourceDictionary() { Source = new Uri("pack://application:,,,/MahApps.Metro;component/Styles/Controls.xaml") });

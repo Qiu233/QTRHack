@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace QHackLib.FunctionHelper
 {
-	public unsafe class InlineHook
+	public unsafe static class InlineHook
 	{
 		[StructLayout(LayoutKind.Sequential)]
 		public unsafe struct HookInfo
@@ -42,9 +42,8 @@ namespace QHackLib.FunctionHelper
 			public int RawCodeLength;
 			public fixed byte RawCodeBytes[RawCodeBytesLength];
 		}
-		private InlineHook() { }
 
-		public static byte[] GetHeadBytes(byte[] code)
+		private static byte[] GetHeadBytes(byte[] code)
 		{
 			IntPtr ptr3 = Marshal.AllocHGlobal(code.Length);
 			Marshal.Copy(code, 0, ptr3, code.Length);

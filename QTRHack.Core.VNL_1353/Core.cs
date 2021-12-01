@@ -12,19 +12,12 @@ namespace QTRHack.Core.VNL_1353
 {
 	public class Core : BaseCore
 	{
-		public Core() : base()
+		public Core(GameContext gameContext) : base(gameContext)
 		{
 		}
 
-		public override CoreVersionSig VersionSig => new CoreVersionSig(GameType.VNL, Version.Parse("1.3.5.3"), 0);
-		public override Version KernelMinimum => Version.Parse("1.0.0.0");
-
-		public override IGameDataProvider GameDataProvider => new GameDataProvider();
-
-
-		public override void Initialize(GameContext ctx)
+		public override void Initialize()
 		{
-			base.Initialize(ctx);
 		}
 
 	}

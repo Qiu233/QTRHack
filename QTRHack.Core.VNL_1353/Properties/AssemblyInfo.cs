@@ -34,3 +34,5 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
+
+[assembly: QTRHack.Kernel.Interface.Core(CoreVersionSig = "VNL-1.3.5.3-0", KernelMinimum = "1.0.0.0")]

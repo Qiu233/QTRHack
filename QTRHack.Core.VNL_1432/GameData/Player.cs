@@ -1,4 +1,5 @@
-﻿using QTRHack.Kernel.Interface.GameData;
+﻿using QHackLib;
+using QTRHack.Kernel.Interface;
 using QTRHack.Kernel.Interface.GameData.Content;
 using System;
 using System.Collections.Generic;
@@ -8,9 +9,11 @@ using System.Threading.Tasks;
 
 namespace QTRHack.Core.VNL_1432.GameData
 {
-	public class GameDataProvider : IGameDataProvider
+	public class Player : BasePlayer
 	{
-		public BaseItemAccess ItemAccess => new ItemAccess();
-		public BasePlayerAccess PlayerAccess => new PlayerAccess();
+		public Player(BaseCore core, HackObject obj) : base(core, obj)
+		{
+		}
+
 	}
 }

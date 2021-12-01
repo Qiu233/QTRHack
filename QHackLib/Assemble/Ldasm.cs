@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace QHackLib.Assemble
 {
-	public class Ldasm
+	public sealed class Ldasm
 	{
 		public struct ldasm_data
 		{

@@ -1,19 +1,19 @@
 ﻿using QHackLib;
+using QTRHack.Kernel.Interface;
 using QTRHack.Kernel.Interface.GameData.Content;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace QTRHack.Core.VNL_1432.GameData
 {
-	public class PlayerAccess : BasePlayerAccess
+	public class Item : BaseItem
 	{
-		public override GameObject OR_Life(PlayerAccessArgs arg)
+		public Item(BaseCore core, HackObject obj) : base(core, obj)
 		{
-			dynamic player = arg.Player;
-			return player.statLife;
 		}
 	}
 }

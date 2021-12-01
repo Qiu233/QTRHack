@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace QHackLib.Assemble
 {
-	public class Assembler
+	public sealed class Assembler
 	{
 		private readonly List<byte> InternalData;
 		public IReadOnlyList<byte> Data

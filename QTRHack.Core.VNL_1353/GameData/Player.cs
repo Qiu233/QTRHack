@@ -1,4 +1,5 @@
 ﻿using QHackLib;
+using QTRHack.Kernel.Interface;
 using QTRHack.Kernel.Interface.GameData.Content;
 using System;
 using System.Collections.Generic;
@@ -8,12 +9,11 @@ using System.Threading.Tasks;
 
 namespace QTRHack.Core.VNL_1353.GameData
 {
-	public class PlayerAccess : BasePlayerAccess
+	public class Player : BasePlayer
 	{
-		public override GameObject OR_Life(PlayerAccessArgs arg)
+		public Player(BaseCore core, HackObject obj) : base(core, obj)
 		{
-			dynamic player = arg.Player;
-			return player.statLife;
 		}
+
 	}
 }

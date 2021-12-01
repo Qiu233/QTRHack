@@ -32,8 +32,18 @@ namespace QTRHack.Kernel
 
 		public void SetCore(BaseCore core)
 		{
-			core.Initialize(GameContext);
+			core.Initialize();
 			Core = core;
+		}
+
+		public T MakeGameObject<T>(HackObject obj) where T : GameObject
+		{
+			return Core.MakeGameDataAccess<T>(obj);
+		}
+
+		public T GetStaticGameObject<T>(string typeName, string fieldName) where T : GameObject
+		{
+			return MakeGameObject<T>(GameContext.GetStaticGameObject(typeName, fieldName));
 		}
 
 		/// <summary>
@@ -49,36 +59,6 @@ namespace QTRHack.Kernel
 		public void Dispose()
 		{
 			GameContext.Dispose();
-		}
-
-		private GDAccess<T> GetGDHandler<T>() where T : GDAccessArgs
-		{
-			var type = Core.GameDataProvider.GetType();
-			Type vType = typeof(T);
-			PropertyInfo[] handlers = type.
-				GetProperties().Where(
-					t => t.PropertyType.IsSubclassOf(typeof(GDAccess<T>))).ToArray();//find all possible handlers
-			if (vType == typeof(GDAccessArgs))
-				throw new HackKernelException($"Cannot get handler for {typeof(GDAccessArgs).FullName}");
-			if (handlers.Length > 1)//more than 1 found
-			{
-				throw new HackKernelException($"More than 1 request handler that accepts {vType.FullName} found in class: {type.FullName}");
-			}
-			else if (handlers.Length == 0)//no handler found
-			{
-				throw new HackKernelException($"Cannot get handler for {vType.FullName}");
-			}
-			return handlers[0].GetValue(Core.GameDataProvider) as GDAccess<T>;
-		}
-
-		public V RequestGD<T, V>(GDRequest<T> request) where T : GDAccessArgs
-		{
-			return GetGDHandler<T>().Request<V>(request);
-		}
-
-		public V RequestGD<T, V>(string mode, T args) where T : GDAccessArgs
-		{
-			return RequestGD<T, V>(new GDRequest<T>() { Args = args, Mode = mode });
 		}
 	}
 }

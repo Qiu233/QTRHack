@@ -68,7 +68,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Controls\DraggableCross.cs" />
-    <Compile Include="MainWindow.cs" />
+    <Compile Include="DataModels\PlayerCollection.cs" />
+    <Compile Include="HackContext.cs" />
+    <Compile Include="MainWindow.xaml.cs">
+      <DependentUpon>MainWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="StartupWindow.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -99,6 +103,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\QHackLib\QHackLib.csproj">
+      <Project>{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}</Project>
+      <Name>QHackLib</Name>
+    </ProjectReference>
     <ProjectReference Include="..\QTRHack.Kernel\QTRHack.Kernel.csproj">
       <Project>{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}</Project>
       <Name>QTRHack.Kernel</Name>
@@ -106,6 +114,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Page Include="MainWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="Resources\Languages\en-US.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -115,5 +127,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

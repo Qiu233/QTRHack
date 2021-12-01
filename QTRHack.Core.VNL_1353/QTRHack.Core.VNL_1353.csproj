@@ -43,9 +43,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Core.cs" />
-    <Compile Include="GameData\GameDataProvider.cs" />
-    <Compile Include="GameData\ItemAccess.cs" />
-    <Compile Include="GameData\PlayerAccess.cs" />
+    <Compile Include="GameData\Item.cs" />
+    <Compile Include="GameData\Player.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -55,7 +54,7 @@
       <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\QTRHack.Kernel\QTRHack.Kernel.csproj">
-      <Project>{f7ee891f-7b91-43d3-a1ae-2c8ce8ea7703}</Project>
+      <Project>{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}</Project>
       <Name>QTRHack.Kernel</Name>
       <Private>False</Private>
     </ProjectReference>

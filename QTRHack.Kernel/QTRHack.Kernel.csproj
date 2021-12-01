@@ -77,17 +77,25 @@
   <ItemGroup>
     <Compile Include="Interface\BaseCore.cs" />
     <Compile Include="Interface\BasePlugin.cs" />
+    <Compile Include="Interface\CoreAttribute.cs" />
     <Compile Include="Interface\CoreVersionSig.cs" />
     <Compile Include="GameContext.cs" />
     <Compile Include="HackKernel.cs" />
     <Compile Include="HackKernelException.cs" />
-    <Compile Include="Interface\GameData\Content\BaseItemAccess.cs" />
-    <Compile Include="Interface\GameData\Content\BasePlayerAccess.cs" />
-    <Compile Include="Interface\GameData\GDAccess.cs" />
-    <Compile Include="Interface\GameData\GDAccessArgs.cs" />
-    <Compile Include="Interface\GameData\GDRequest.cs" />
-    <Compile Include="Interface\GameData\IGameDataProvider.cs" />
+    <Compile Include="Interface\GameData\Content\BaseItem.cs" />
+    <Compile Include="Interface\GameData\Content\BasePlayer.cs" />
+    <Compile Include="Interface\GameData\GameObject.cs" />
+    <Compile Include="Interface\GameData\GameObjectArray.cs" />
+    <Compile Include="Interface\GameData\GameObjectArray2D.cs" />
+    <Compile Include="Interface\GameData\GameObjectArrayMD.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RemoteExecution\ActionOnManagedThread.cs" />
+    <Compile Include="RemoteExecution\ActionOnMethod.cs" />
+    <Compile Include="RemoteExecution\ActionOnNativeThread.cs" />
+    <Compile Include="RemoteExecution\HookOnAddress.cs" />
+    <Compile Include="RemoteExecution\IRemoteExecution.cs" />
+    <Compile Include="RemoteExecution\RemoteAction.cs" />
+    <Compile Include="RemoteExecution\RemoteHook.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\QHackLib\QHackLib.csproj">

@@ -2,7 +2,6 @@
 using QHackLib;
 using QHackLib.Assemble;
 using QHackLib.FunctionHelper;
-using QTRHack.Kernel.Interface.GameData;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

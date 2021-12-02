@@ -8,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Kernel.Interface.GameData.Content
+namespace QTRHack.Kernel.Interface.GameObjects.Content
 {
 	public abstract class BaseItem : GameObject
 	{

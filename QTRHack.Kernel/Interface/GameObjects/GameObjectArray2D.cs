@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Kernel.Interface.GameData
+namespace QTRHack.Kernel.Interface.GameObjects
 {
 	/// <summary>
 	/// For 2D arrays.<br/>

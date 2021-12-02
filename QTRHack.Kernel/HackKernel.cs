@@ -1,7 +1,7 @@
 ﻿using Microsoft.Diagnostics.Runtime;
 using QHackLib;
 using QTRHack.Kernel.Interface;
-using QTRHack.Kernel.Interface.GameData;
+using QTRHack.Kernel.Interface.GameObjects;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;

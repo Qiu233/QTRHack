@@ -1,6 +1,6 @@
 ﻿using QHackLib;
 using QTRHack.Kernel.Interface;
-using QTRHack.Kernel.Interface.GameData.Content;
+using QTRHack.Kernel.Interface.GameObjects.Content;
 using System;
 using System.Collections.Generic;
 using System.Drawing;

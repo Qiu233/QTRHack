@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Kernel.Interface.GameData
+namespace QTRHack.Kernel.Interface.GameObjects
 {
 	public abstract class GameObject : IEquatable<GameObject>
 	{

@@ -1,7 +1,7 @@
 ﻿using QTRHack.Core.VNL_1353.GameData;
 using QTRHack.Kernel;
 using QTRHack.Kernel.Interface;
-using QTRHack.Kernel.Interface.GameData;
+using QTRHack.Kernel.Interface.GameObjects;
 using System;
 using System.Collections.Generic;
 using System.Linq;

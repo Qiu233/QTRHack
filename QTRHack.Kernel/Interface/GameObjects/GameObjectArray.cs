@@ -6,7 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QTRHack.Kernel.Interface.GameData
+namespace QTRHack.Kernel.Interface.GameObjects
 {
 	/// <summary>
 	/// For array of ref types.

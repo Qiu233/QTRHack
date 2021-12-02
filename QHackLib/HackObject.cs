@@ -147,17 +147,21 @@ namespace QHackLib
 			return true;
 		}
 
+		public HackObject InternalGetMember(string name)
+		{
+			return new HackObject(Context, InternalClrObject.GetFieldFrom(name));
+		}
 
 		public override bool TryGetMember(GetMemberBinder binder, out object result)
 		{
-			result = new HackObject(Context, InternalClrObject.GetFieldFrom(binder.Name));
+			result = InternalGetMember(binder.Name);
 			return true;
 		}
 
-		public override bool TrySetMember(SetMemberBinder binder, object value)
+		public void InternalSetMember(string name, object value)
 		{
 			Type valueType = value.GetType();
-			ClrInstanceField field = InternalClrObject.Type.GetFieldByName(binder.Name);
+			ClrInstanceField field = InternalClrObject.Type.GetFieldByName(name);
 			if (value is IAddressableTypedEntity entity && entity.Type != field.Type)
 				throw new HackObjectTypeException($"Not the same type as {field.Type.Name}.", entity.Type.Name);
 			if (value is ClrObject obj)
@@ -185,29 +189,27 @@ namespace QHackLib
 			{
 				throw new HackObjectTypeException($"Value of ref type cannot be set to a object.", valueType.FullName);
 			}
+		}
+
+		public override bool TrySetMember(SetMemberBinder binder, object value)
+		{
+			InternalSetMember(binder.Name, value);
 			return true;
 		}
 
-		/// <summary>
-		/// 
-		/// </summary>
-		/// <param name="binder"></param>
-		/// <param name="args"></param>
-		/// <param name="result"></param>
-		/// <returns></returns>
-		public override bool TryInvokeMember(InvokeMemberBinder binder, object[] args, out object result)
+		/*public object InternalInvokeMember(string name, object[] args)
 		{
 			if (args.Length == 0)//default
 			{
-				result = new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Name == binder.Name)).Call(InternalClrObject);
+				return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Name == name)).Call(InternalClrObject);
 			}
 			else if (args.Length == 1)//filter
 			{
 				object arg0 = args[0];
 				if (arg0 is Func<ClrMethod, bool> filter)
-					result = new HackMethod(Context, InternalClrObject.Type.Methods.First(t => filter(t))).Call(InternalClrObject);
+					return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => filter(t))).Call(InternalClrObject);
 				else if (arg0 is string sig)
-					result = new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Signature == sig)).Call(InternalClrObject);
+					return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Signature == sig)).Call(InternalClrObject);
 				else
 					throw new HackObjectInvalidArgsException("Unexpected arg when trying to get a method, accepts only a filter or a signature string.");
 			}
@@ -215,14 +217,27 @@ namespace QHackLib
 			{
 				throw new HackObjectInvalidArgsException("More than 1 args when trying to get a method, accepts only a filter or a signature string.");
 			}
-			return true;
+		}*/
+
+		public HackMethodCall GetMethodCall(string sig)
+		{
+			return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Signature == sig)).Call(InternalClrObject);
+		}
+		public HackMethodCall GetMethodCall(Func<ClrMethod, bool> filter)
+		{
+			return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => filter(t))).Call(InternalClrObject);
+		}
+
+		public object InternalConvert(Type type)
+		{
+			if (!type.IsValueType)
+				throw new HackObjectConvertException(type);
+			return Context.DataAccess.Read(type, BaseAddress);
 		}
 
 		public override bool TryConvert(ConvertBinder binder, out object result)
 		{
-			if (!binder.Type.IsValueType)
-				throw new HackObjectConvertException(binder.Type);
-			result = Context.DataAccess.Read(binder.Type, BaseAddress);
+			result = InternalConvert(binder.Type);
 			return true;
 		}
 

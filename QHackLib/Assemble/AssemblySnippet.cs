@@ -171,12 +171,12 @@ namespace QHackLib.Assemble
 		#region Thread
 		public static AssemblySnippet StartManagedThread(Context ctx, int lpCodeAddr, int lpwStrName_System_Action)
 		{
-			int ctorCharPtrMethod = ctx.MSCORLIBAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
-			int getTypeMethod = ctx.MSCORLIBAddressHelper.GetFunctionAddress("System.Type",
+			int ctorCharPtrMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
+			int getTypeMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Type",
 				t => t.Signature == "System.Type.GetType(System.String)");
-			int getPtrMethod = ctx.MSCORLIBAddressHelper.GetFunctionAddress("System.Runtime.InteropServices.Marshal",
+			int getPtrMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Runtime.InteropServices.Marshal",
 				t => t.Signature == "System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer(IntPtr, System.Type)");
-			int taskRunMethod = ctx.MSCORLIBAddressHelper.GetFunctionAddress("System.Threading.Tasks.Task",
+			int taskRunMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Threading.Tasks.Task",
 				t => t.Signature == "System.Threading.Tasks.Task.Run(System.Action)");
 			return FromCode(
 					new AssemblyCode[] {
@@ -271,7 +271,7 @@ namespace QHackLib.Assemble
 		/// <returns></returns>
 		public static AssemblySnippet FromConstructString(Context ctx, int strMemPtr)
 		{
-			int ctor = ctx.MSCORLIBAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
+			int ctor = ctx.BCLAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
 			return FromClrCall(ctor, false, 0, null, strMemPtr);
 		}
 
@@ -286,7 +286,7 @@ namespace QHackLib.Assemble
 		/// <returns></returns>
 		public static AssemblySnippet FromLoadAssembly(Context ctx, int assemblyFileNamePtr)
 		{
-			int loadFrom = ctx.MSCORLIBAddressHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
+			int loadFrom = ctx.BCLAddressHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
 			return FromClrCall(loadFrom, false, null, null, assemblyFileNamePtr);
 		}
 

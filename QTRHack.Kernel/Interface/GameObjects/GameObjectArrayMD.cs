@@ -7,19 +7,26 @@ using System.Threading.Tasks;
 
 namespace QTRHack.Kernel.Interface.GameObjects
 {
+	public interface IGameObjectArrayMD<T>
+	{
+		int Rank { get; }
+		int GetLength(int dimension);
+		T GetValue(params int[] indexes);
+		void SetValue(T value, params int[] indexes);
+	}
 	/// <summary>
 	/// For multidimensional arrays.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public class GameObjectArrayMD<T> : GameObject where T : GameObject
+	public class GameObjectArrayMD<T> : GameObject, IGameObjectArrayMD<T> where T : GameObject
 	{
 		public int Rank =>
 			TypedInternalObject.GetArrayRank();
 		public int GetLength(int dimension) =>
 			TypedInternalObject.GetArrayLength(dimension);
-		public T GetValue(params int[] indexes) => 
+		public T GetValue(params int[] indexes) =>
 			Core.MakeGameDataAccess<T>(TypedInternalObject.InternalGetIndex(indexes.Select(t => (object)t).ToArray()));
-		public void SetValue(T value, params int[] indexes) => 
+		public void SetValue(T value, params int[] indexes) =>
 			TypedInternalObject.InternalSetIndex(indexes.Select(t => (object)t).ToArray(), value.InternalObject);
 
 		public GameObjectArrayMD(BaseCore core, HackObject obj) : base(core, obj)
@@ -30,7 +37,7 @@ namespace QTRHack.Kernel.Interface.GameObjects
 	/// For fast access to unmanaged types.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public class GameObjectArrayMDV<T> : GameObject where T : unmanaged
+	public class GameObjectArrayMDV<T> : GameObject, IGameObjectArrayMD<T> where T : unmanaged
 	{
 		public int Rank =>
 			TypedInternalObject.GetArrayRank();

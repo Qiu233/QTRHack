@@ -8,11 +8,28 @@ using System.Threading.Tasks;
 
 namespace QTRHack.Kernel.Interface.GameObjects
 {
+	public interface IGameObjectArray<out T> : IEnumerable<T>
+	{
+		int Length { get; }
+		T this[int index] { get; }
+	}
+	public class GameObjectArrayEnumerator<T> : IEnumerator<T>
+	{
+		private int Index = -1;
+		public IGameObjectArray<T> Data { get; }
+		public T Current => Data[Index];
+		object IEnumerator.Current => Current;
+
+		internal GameObjectArrayEnumerator(IGameObjectArray<T> data) => Data = data;
+		public bool MoveNext() => ++Index < Data.Length;
+		public void Reset() => Index = -1;
+		public void Dispose() { }
+	}
 	/// <summary>
 	/// For array of ref types.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public sealed class GameObjectArray<T> : GameObject, IEnumerable<T> where T : GameObject
+	public sealed class GameObjectArray<T> : GameObject, IGameObjectArray<T> where T : GameObject
 	{
 		public int Length => TypedInternalObject.GetArrayLength();
 		public T this[int index]
@@ -24,25 +41,14 @@ namespace QTRHack.Kernel.Interface.GameObjects
 		{
 		}
 
-		public IEnumerator GetEnumerator() => (this as IEnumerable<T>).GetEnumerator();
-		IEnumerator<T> IEnumerable<T>.GetEnumerator() => new GameObjectArrayEnumerator(this);
-		private sealed class GameObjectArrayEnumerator : IEnumerator<T>
-		{
-			T IEnumerator<T>.Current => Data[Index];
-			public object Current => (this as IEnumerator<T>).Current;
-			public GameObjectArray<T> Data { get; }
-			private int Index = -1;
-			public GameObjectArrayEnumerator(GameObjectArray<T> data) => Data = data;
-			public bool MoveNext() => ++Index < Data.Length;
-			public void Reset() => Index = -1;
-			public void Dispose() { }
-		}
+		public IEnumerator<T> GetEnumerator() => new GameObjectArrayEnumerator<T>(this);
+		IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 	}
 	/// <summary>
 	/// For fast access unmanaged types.
 	/// </summary>
 	/// <typeparam name="T"></typeparam>
-	public sealed class GameObjectArrayV<T> : GameObject, IEnumerable<T> where T : unmanaged
+	public sealed class GameObjectArrayV<T> : GameObject, IGameObjectArray<T> where T : unmanaged
 	{
 		public int Length => TypedInternalObject.GetArrayLength();
 		public T this[int index]
@@ -54,19 +60,8 @@ namespace QTRHack.Kernel.Interface.GameObjects
 		{
 		}
 
-		public IEnumerator GetEnumerator() => (this as IEnumerable<T>).GetEnumerator();
-		IEnumerator<T> IEnumerable<T>.GetEnumerator() => new GameObjectArrayEnumerator(this);
-		private sealed class GameObjectArrayEnumerator : IEnumerator<T>
-		{
-			T IEnumerator<T>.Current => Data[Index];
-			public object Current => (this as IEnumerator<T>).Current;
-			public GameObjectArrayV<T> Data { get; }
-			private int Index = -1;
-			public GameObjectArrayEnumerator(GameObjectArrayV<T> data) => Data = data;
-			public bool MoveNext() => ++Index < Data.Length;
-			public void Reset() => Index = -1;
-			public void Dispose() { }
-		}
+		public IEnumerator<T> GetEnumerator() => new GameObjectArrayEnumerator<T>(this);
+		IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 	}
 	/// <summary>
 	/// For when no GameObject wrapper is implemented.

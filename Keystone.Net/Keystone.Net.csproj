@@ -58,4 +58,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>xcopy "$(ProjectDir)..\refdlls\keystone.dll" ".\" /D /F /K /R /Y</PostBuildEvent>
+  </PropertyGroup>
 </Project>

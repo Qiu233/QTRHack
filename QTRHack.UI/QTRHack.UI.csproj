@@ -106,6 +106,7 @@
     <ProjectReference Include="..\QHackLib\QHackLib.csproj">
       <Project>{CC1B3A7E-33AA-487D-AE8E-2B5B2CE3FEF1}</Project>
       <Name>QHackLib</Name>
+      <Private>False</Private>
     </ProjectReference>
     <ProjectReference Include="..\QTRHack.Kernel\QTRHack.Kernel.csproj">
       <Project>{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}</Project>

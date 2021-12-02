@@ -53,6 +53,11 @@
       <Name>QHackLib</Name>
       <Private>False</Private>
     </ProjectReference>
+    <ProjectReference Include="..\QTRHack.Core\QTRHack.Core.csproj">
+      <Project>{39DCB1C0-52FC-47DC-B4ED-62253F9890F0}</Project>
+      <Name>QTRHack.Core</Name>
+      <Private>False</Private>
+    </ProjectReference>
     <ProjectReference Include="..\QTRHack.Kernel\QTRHack.Kernel.csproj">
       <Project>{F7EE891F-7B91-43D3-A1AE-2C8CE8EA7703}</Project>
       <Name>QTRHack.Kernel</Name>

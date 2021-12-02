@@ -93,7 +93,7 @@ namespace QHackLib
 		public DataTarget DataTarget { get; }
 		public ClrRuntime Runtime { get; }
 		public AddressHelper MainAddressHelper { get; }
-		public AddressHelper MSCORLIBAddressHelper { get; }
+		public AddressHelper BCLAddressHelper { get; }
 		public AddressHelper[] AddressHelpers { get; }
 		private Dictionary<string, AddressHelper> NameToAddressHelper { get; }
 		public DataAccess DataAccess => new DataAccess(Handle);
@@ -119,7 +119,7 @@ namespace QHackLib
 			LoadAllAddressHelpers();
 
 			MainAddressHelper = GetAddressHelper(moduleName);//这句必须最后执行，因为需要用到Context里面的一点信息
-			MSCORLIBAddressHelper = GetAddressHelper("mscorlib.dll");
+			BCLAddressHelper = GetAddressHelper("mscorlib.dll");
 		}
 
 		public AddressHelper GetAddressHelper(string ModuleName)

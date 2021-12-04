@@ -97,6 +97,44 @@ namespace QHackLib
 			Context.DataAccess.Write<T>((int)field.GetAddress((ulong)obj), value);
 		}
 
+		public HackObject GetStaticHackObject(string typeName, string fieldName)
+		{
+			ClrType type = GetClrType(typeName);
+			ClrStaticField field = type.GetStaticFieldByName(fieldName);
+			return new HackObject(Context, field.Type.IsValueType ?
+				field.ReadStruct(Context.Runtime.AppDomains[0]) :
+				(IAddressableTypedEntity)field.ReadObject(Context.Runtime.AppDomains[0]));
+		}
+
+		public T GetStaticHackObjectValue<T>(string typeName, string fieldName) where T : unmanaged
+		{
+			ClrType type = GetClrType(typeName);
+			ClrStaticField field = type.GetStaticFieldByName(fieldName);
+			return field.Read<T>(Context.Runtime.AppDomains[0]);
+		}
+
+		public void SetStaticHackObject<T>(string typeName, string fieldName, T value) where T : HackObject
+		{
+			ClrType type = GetClrType(typeName);
+			ClrStaticField field = type.GetStaticFieldByName(fieldName);
+			if (!value.ClrType.IsPrimitive && value.ClrType != field.Type)
+				throw new ClrTypeNotMatchedException("Ref type not matched.", nameof(value));
+			int addr = (int)field.GetAddress(Context.Runtime.AppDomains[0]);
+			if (field.Type.IsPrimitive)
+				Context.DataAccess.WriteBytes(addr, Context.DataAccess.ReadBytes(value.BaseAddress, value.ClrType.StaticSize - IntPtr.Size * 2));
+			else
+				Context.DataAccess.Write(addr, Context.DataAccess.Read<IntPtr>(value.BaseAddress));
+		}
+
+		public void SetStaticHackObjectValue<T>(string typeName, string fieldName, T value) where T : unmanaged
+		{
+			ClrType type = GetClrType(typeName);
+			ClrStaticField field = type.GetStaticFieldByName(fieldName);
+			if (!field.Type.IsPrimitive)
+				throw new ClrTypeNotMatchedException("Ref type not matched.", nameof(fieldName));
+			Context.DataAccess.Write<T>((int)field.GetAddress(Context.Runtime.AppDomains[0]), value);
+		}
+
 		private Exception MakeArgNotFoundException<T>(string fieldName, string fieldValue)
 		{
 			Type type = typeof(T);
@@ -111,6 +149,10 @@ namespace QHackLib
 			return new ArgumentException($"No such {typeof(T).Name} found", fieldName);
 		}
 
+		internal class ClrTypeNotMatchedException : ArgumentException
+		{
+			public ClrTypeNotMatchedException(string msg, string param) : base(msg, param) { }
+		}
 		internal class ClrTypeNotFoundException : ArgumentException
 		{
 			public ClrTypeNotFoundException(string msg, string param) : base(msg, param) { }

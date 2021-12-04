@@ -43,7 +43,20 @@ namespace QTRHack.Kernel
 
 		public T GetStaticGameObject<T>(string typeName, string fieldName) where T : GameObject
 		{
-			return MakeGameObject<T>(GameContext.GetStaticGameObject(typeName, fieldName));
+			return MakeGameObject<T>(GameContext.GameAddressHelper.GetStaticHackObject(typeName, fieldName));
+		}
+		public T GetStaticGameObjectValue<T>(string typeName, string fieldName) where T : unmanaged
+		{
+			return GameContext.GameAddressHelper.GetStaticHackObject(typeName, fieldName).InternalConvert<T>();
+		}
+
+		public void SetStaticGameObject<T>(string typeName, string fieldName, T value) where T : GameObject
+		{
+			GameContext.GameAddressHelper.SetStaticHackObject(typeName, fieldName, value.TypedInternalObject);
+		}
+		public void SetStaticGameObjectValue<T>(string typeName, string fieldName, T value) where T : unmanaged
+		{
+			GameContext.GameAddressHelper.SetStaticHackObjectValue(typeName, fieldName, value);
 		}
 
 		/// <summary>

@@ -34,16 +34,9 @@ namespace QTRHack.Kernel
 		private GameContext(Process process)
 		{
 			GameProcess = process;
-			ProcessContext = Context.Create(process.Id);
+			ProcessContext = Context.Create(process);
 			GameAddressHelper = ProcessContext.MainAddressHelper;
 			GameAssemblyName = AssemblyName.GetAssemblyName(GameProcess.MainModule.FileName);
-		}
-
-		public dynamic GetStaticGameObject(string typeName, string fieldName)
-		{
-			ClrType type = GameAddressHelper.GetClrType(typeName);
-			ClrStaticField field = type.GetStaticFieldByName(fieldName);
-			return new HackObject(ProcessContext, field.ReadObject(ProcessContext.Runtime.AppDomains[0]));
 		}
 
 		public HackMethodCall GetStaticMethod(string typeName, Func<ClrMethod, bool> filter)

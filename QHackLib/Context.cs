@@ -142,10 +142,9 @@ namespace QHackLib
 			return new AddressHelper(this, module);
 		}
 
-		public static Context Create(int processID)
+		public static Context Create(Process process)
 		{
-			Process process = Process.GetProcessById(processID);
-			return new Context(process.ProcessName, processID, OpenProcess(PROCESS_ALL_ACCESS, false, processID), process.ProcessName + ".exe");
+			return new Context(process.ProcessName, process.Id, OpenProcess(PROCESS_ALL_ACCESS, false, process.Id), process.ProcessName + ".exe");
 		}
 
 		public void Dispose()

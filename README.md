@@ -1,10 +1,8 @@
-# QTRHack
-QTRHack is a rewritten version of QTRHacker which can be found in another repo.
-
-# About the name
+# QTRHack(still under development)
+QTRHack is a rewritten version of QTRHacker which can be found in another repo.  
 Actually I didn't think of any name that fits this project, so temporarily removed the last two letters just to distinguish from the older one.  
 
-# What's new(still under development)
+# What's new
 Currently nothing new in functionality but a little in techniques and architecture.  
 
 New GUI: using WPF with MahApps.Metro, which means the UI would be more effective and easy to use.  
@@ -40,3 +38,34 @@ But the good news is that you can convert a `HackObject` to an `unmanaged` type 
 * `QHackLib.Assemble.AssemblySnippet.FromClrCall()` has been rewritten. Now it can completely automatically decide how to pass arguments when calling functions. 
 The only price is that you should specify the `return buffer` on your own. For more information about this, see [botr: Return-buffers](https://github.com/dotnet/runtime/blob/main/docs/design/coreclr/botr/clr-abi.md#return-buffers). 
 If you're not sure about this, **then do not call methods that return a structure!**
+
+# Get Started
+Here are several tutorials to help you understand this solution.(assuming you're playing vanilla 1.4.3.2).  
+You should:
+1. Download or clone the repository.
+2. Create a new `.NET Framework Console` project in the solution.(assuming name is `XXX`)
+3. Add references to `QHackLib`/`QTRHack.Kernel`/`QTRHack.Core`/`QTRHack.Core.VNL_1432`
+4. `Ctrl + F5`, nothing to run, just to create `bin` directory.
+5. Copy `./refdlls/keystone.dll` to `./XXX/bin/Debug` or `./XXX/bin/Release`.
+
+In the main method, try the following code snippets.
+## 1.Attach to game
+This is the framework.
+```C#
+using (HackKernel kernel = HackKernel.Create(Process.GetProcessesByName("Terraria")[0]))//Assuming that your game process is Terraria.exe
+{
+	kernel.SetCore(BaseCore.GetCore(kernel.GameContext, "VNL-1.4.3.2-0"));//Load 1.4.3.2 core
+}
+```
+
+## 2.Get my player's StatLife
+```
+using (HackKernel kernel = HackKernel.Create(Process.GetProcessesByName("Terraria")[0]))
+{
+	kernel.SetCore(BaseCore.GetCore(kernel.GameContext, "VNL-1.4.3.2-0"));
+	GameObjectArray<BasePlayer> players = kernel.GetStaticGameObject<GameObjectArray<BasePlayer>>("Terraria.Main", "player");
+	int myPlayer = kernel.GetStaticGameObjectValue<int>("Terraria.Main", "myPlayer");
+	BasePlayer curPlayer = players[myPlayer];
+	Console.WriteLine(curPlayer.StatLife);
+}
+```

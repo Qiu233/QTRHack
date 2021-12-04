@@ -59,13 +59,13 @@ using (HackKernel kernel = HackKernel.Create(Process.GetProcessesByName("Terrari
 ```
 
 ## 2.Get my player's StatLife
-```
+```C#
 using (HackKernel kernel = HackKernel.Create(Process.GetProcessesByName("Terraria")[0]))
 {
 	kernel.SetCore(BaseCore.GetCore(kernel.GameContext, "VNL-1.4.3.2-0"));
-	GameObjectArray<BasePlayer> players = kernel.GetStaticGameObject<GameObjectArray<BasePlayer>>("Terraria.Main", "player");
-	int myPlayer = kernel.GetStaticGameObjectValue<int>("Terraria.Main", "myPlayer");
-	BasePlayer curPlayer = players[myPlayer];
-	Console.WriteLine(curPlayer.StatLife);
+	GameObjectArray<BasePlayer> players = kernel.GetStaticGameObject<GameObjectArray<BasePlayer>>("Terraria.Main", "player"); //Get Main.player (Player[])
+	int myPlayer = kernel.GetStaticGameObjectValue<int>("Terraria.Main", "myPlayer"); //Get Main.myPlayer (int)
+	BasePlayer curPlayer = players[myPlayer]; //Get Main.player[Main.myPlayer]
+	Console.WriteLine(curPlayer.StatLife); // Output the statLife
 }
 ```

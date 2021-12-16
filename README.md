@@ -29,9 +29,9 @@ Actually `QHackLib` can be considered a fair wrapper for [`clrMD`](https://githu
 ### Core Concepts
 * `QHackLib.Context` represents the per-process context of hack, only through which can you access the target process. 
 To get an instance of this class, call `QHackLib.Context.Create()`. 
-When hack is all done, call `QHackLib.Context.Dispose` to release resource this class use.  
+When hack is all done, call `QHackLib.Context.Dispose` to release resource this instance uses.  
 * `QHackLib.DataAccess` provides all types of data access to target process as well as memory allocation and reclamation. 
-Use generic method as possible because those are the fasted way.  
+Use generic method as possible because those are the fastest way.  
 * `QHackLib.HackObject` is a `dynamic` wrapper for objects in clr. You can access its fields simply by name and index it(if is array) using `int[]` as indexes. 
 No matter how you access it, you will get another instance of `HackObject` even if the field is typed `unmanaged`. 
 But the good news is that you can convert a `HackObject` to an `unmanaged` type by casting implicitly or explicitly from `dynamic`.

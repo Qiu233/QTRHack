@@ -43,76 +43,77 @@ namespace QHackLib
 		}
 
 		[DllImport("kernel32.dll")]
-		internal static extern int VirtualAllocEx(
-			int hProcess, int lpAddress,
-			int dwSize,
+		internal static extern IntPtr VirtualAllocEx(
+			nuint hProcess,
+			IntPtr lpAddress,
+			nuint dwSize,
 			AllocationType flAllocationType,
 			ProtectionType flProtect);
 		[DllImport("kernel32.dll")]
-		internal static extern int VirtualFreeEx(
-			int hProcess,
-			int lpAddress,
-			int dwSize,
+		internal static extern IntPtr VirtualFreeEx(
+			nuint hProcess,
+			IntPtr lpAddress,
+			nuint dwSize,
 			AllocationType dwFreeType = AllocationType.MEM_RELEASE);
 		[DllImport("kernel32.dll")]
 		internal unsafe static extern bool ReadProcessMemory
 		(
-			int lpProcess,
-			int lpBaseAddress,
+			nuint lpProcess,
+			IntPtr lpBaseAddress,
 			void* lpBuffer,
-			int nSize,
-			int BytesRead
+			nuint nSize,
+			nuint BytesRead
 		);
 		[DllImport("kernel32.dll")]
 		internal unsafe static extern bool ReadProcessMemory
 		(
-			int lpProcess,
-			int lpBaseAddress,
+			nuint lpProcess,
+			IntPtr lpBaseAddress,
 			byte[] lpBuffer,
-			int nSize,
-			int BytesRead
+			nuint nSize,
+			nuint BytesRead
 		);
 		[DllImport("kernel32.dll")]
 		internal unsafe static extern bool WriteProcessMemory
 		(
-			int lpProcess,
-			int lpBaseAddress,
+			nuint lpProcess,
+			IntPtr lpBaseAddress,
 			void* lpBuffer,
-			int nSize,
-			int BytesWrite
+			nuint nSize,
+			nuint BytesWrite
 		);
 		[DllImport("kernel32.dll")]
 		internal unsafe static extern bool WriteProcessMemory
 		(
-			int lpProcess,
-			int lpBaseAddress,
+			nuint lpProcess,
+			IntPtr lpBaseAddress,
 			byte[] lpBuffer,
-			int nSize,
-			int BytesWrite
+			nuint nSize,
+			nuint BytesWrite
 		);
 		#endregion
 
 		#region Wrapped reader and writers
 
-		public unsafe T Read<T>(int addr) where T : unmanaged
+		public unsafe T Read<T>(IntPtr addr) where T : unmanaged
 		{
-			T t = new T();
-			ReadProcessMemory(ProcessHandle, addr, &t, sizeof(T), 0);
+			T t = default;
+			ReadProcessMemory(ProcessHandle, addr, &t, (nuint)sizeof(T), 0);
 			return t;
 		}
-		public unsafe void Write<T>(int addr, T value) where T : unmanaged
+		public unsafe void Write<T>(IntPtr addr, T value) where T : unmanaged
 		{
-			WriteProcessMemory(ProcessHandle, addr, &value, sizeof(T), 0);
+			WriteProcessMemory(ProcessHandle, addr, &value, (nuint)sizeof(T), 0);
 		}
 
 
-		public unsafe void Read<T>(int addr, void* pData) where T : unmanaged
+		public unsafe void Read<T>(IntPtr addr, void* pData) where T : unmanaged
 		{
-			ReadProcessMemory(ProcessHandle, addr, pData, sizeof(T), 0);
+			ReadProcessMemory(ProcessHandle, addr, pData, (nuint)sizeof(T), 0);
 		}
-		public unsafe void Write<T>(int addr, void* pValue) where T : unmanaged
+		public unsafe void Write<T>(IntPtr addr, void* pValue) where T : unmanaged
 		{
-			WriteProcessMemory(ProcessHandle, addr, pValue, sizeof(T), 0);
+			WriteProcessMemory(ProcessHandle, addr, pValue, (nuint)sizeof(T), 0);
 		}
 
 		/// <summary>
@@ -121,13 +122,13 @@ namespace QHackLib
 		/// <param name="type">ValueType only</param>
 		/// <param name="addr"></param>
 		/// <returns></returns>
-		public unsafe object Read(Type type, int addr)
+		public unsafe object Read(Type type, IntPtr addr)
 		{
 			if (!type.IsValueType)
 				throw new ArgumentException("Not a ValueType", "type");
 			int size = Marshal.SizeOf(type);
 			IntPtr ptr = Marshal.AllocHGlobal(size);
-			ReadProcessMemory(ProcessHandle, addr, (void*)ptr, size, 0);
+			ReadProcessMemory(ProcessHandle, addr, (void*)ptr, (nuint)size, 0);
 			object t = Marshal.PtrToStructure(ptr, type);
 			Marshal.FreeHGlobal(ptr);
 			return t;
@@ -138,7 +139,7 @@ namespace QHackLib
 		/// </summary>
 		/// <param name="addr"></param>
 		/// <param name="value">ValueType only</param>
-		public unsafe void Write(int addr, object value)
+		public unsafe void Write(IntPtr addr, object value)
 		{
 			Type type = value.GetType();
 			if (!type.IsValueType)
@@ -146,42 +147,42 @@ namespace QHackLib
 			int size = Marshal.SizeOf(type);
 			IntPtr ptr = Marshal.AllocHGlobal(size);
 			Marshal.StructureToPtr(value, ptr, false);
-			WriteProcessMemory(ProcessHandle, addr, (void*)ptr, size, 0);
+			WriteProcessMemory(ProcessHandle, addr, (void*)ptr, (nuint)size, 0);
 			Marshal.FreeHGlobal(ptr);
 		}
 
-		public void Read(int addr, byte[] buffer, int length)
+		public void Read(IntPtr addr, byte[] buffer, int length)
 		{
 			if (length > buffer.Length)
 				throw new ArgumentException("Length of bytes to read exceeded the buffer", "length");
-			ReadProcessMemory(ProcessHandle, addr, buffer, length, 0);
+			ReadProcessMemory(ProcessHandle, addr, buffer, (nuint)length, 0);
 		}
-		public void Write(int addr, byte[] buffer, int length)
+		public void Write(IntPtr addr, byte[] buffer, int length)
 		{
 			if (length > buffer.Length)
 				throw new ArgumentException("Length of bytes to write exceeded the buffer", "length");
-			WriteProcessMemory(ProcessHandle, addr, buffer, length, 0);
+			WriteProcessMemory(ProcessHandle, addr, buffer, (nuint)length, 0);
 		}
 
-		public unsafe void Read(int addr, void* buffer, int length)
+		public unsafe void Read(IntPtr addr, void* buffer, int length)
 		{
-			ReadProcessMemory(ProcessHandle, addr, buffer, length, 0);
+			ReadProcessMemory(ProcessHandle, addr, buffer, (nuint)length, 0);
 		}
-		public unsafe void Write(int addr, void* pValue, int length)
+		public unsafe void Write(IntPtr addr, void* pValue, int length)
 		{
-			WriteProcessMemory(ProcessHandle, addr, pValue, length, 0);
+			WriteProcessMemory(ProcessHandle, addr, pValue, (nuint)length, 0);
 		}
 
-		public byte[] ReadBytes(int addr, int length)
+		public byte[] ReadBytes(IntPtr addr, int length)
 		{
 			byte[] bs = new byte[length];
-			ReadProcessMemory(ProcessHandle, addr, bs, bs.Length, 0);
+			ReadProcessMemory(ProcessHandle, addr, bs, (nuint)bs.Length, 0);
 			return bs;
 		}
 
-		public void WriteBytes(int addr, byte[] data)
+		public void WriteBytes(IntPtr addr, byte[] data)
 		{
-			WriteProcessMemory(ProcessHandle, addr, data, data.Length, 0);
+			WriteProcessMemory(ProcessHandle, addr, data, (nuint)data.Length, 0);
 		}
 		#endregion
 
@@ -190,26 +191,26 @@ namespace QHackLib
 		/// Alloc remote memory block
 		/// </summary>
 		/// <param name="size">The size of memory required</param>
-		public int AllocMemory(int size = 1024)//1 kb
+		public IntPtr AllocMemory(int size = 1024)//1 kb
 		{
 			return AllocMemory(AllocationType.MEM_COMMIT, ProtectionType.PAGE_EXECUTE_READWRITE, size);
 		}
-		internal int AllocMemory(AllocationType allocationType, ProtectionType protectionType, int size = 1024)
+		internal IntPtr AllocMemory(AllocationType allocationType, ProtectionType protectionType, int size = 1024)
 		{
-			return VirtualAllocEx(ProcessHandle, 0, size, allocationType, protectionType);
+			return VirtualAllocEx(ProcessHandle, IntPtr.Zero, (nuint)size, allocationType, protectionType);
 		}
 
 		/// <summary>
 		/// Free a remote memory block
 		/// </summary>
 		/// <param name="addr"></param>
-		public void FreeMemory(int addr)
+		public void FreeMemory(IntPtr addr)
 		{
 			FreeMemory(addr, AllocationType.MEM_RELEASE);
 		}
-		internal void FreeMemory(int addr, AllocationType allocationType = AllocationType.MEM_RELEASE)
+		internal void FreeMemory(IntPtr addr, AllocationType allocationType = AllocationType.MEM_RELEASE)
 		{
-			VirtualFreeEx(ProcessHandle, 0, 0, allocationType);
+			VirtualFreeEx(ProcessHandle, IntPtr.Zero, 0, allocationType);
 		}
 		#endregion
 
@@ -219,10 +220,10 @@ namespace QHackLib
 		/// </summary>
 		/// <param name="str"></param>
 		/// <returns></returns>
-		public int NewWCHARArray(string str)
+		public IntPtr NewWCHARArray(string str)
 		{
 			byte[] data = Encoding.Unicode.GetBytes(str);
-			int addr = AllocMemory(data.Length + 2);
+			IntPtr addr = AllocMemory(data.Length + 2);
 			WriteBytes(addr, data);
 			Write<short>(addr + data.Length, 0);
 			return addr;
@@ -232,10 +233,10 @@ namespace QHackLib
 		/// </summary>
 		/// <param name="str"></param>
 		/// <returns></returns>
-		public int NewCHARArray(string str)
+		public IntPtr NewCHARArray(string str)
 		{
 			byte[] data = Encoding.ASCII.GetBytes(str);
-			int addr = AllocMemory(data.Length + 1);
+			IntPtr addr = AllocMemory(data.Length + 1);
 			WriteBytes(addr, data);
 			Write<byte>(addr + data.Length, 0);
 			return addr;
@@ -251,9 +252,11 @@ namespace QHackLib
 			return data;
 		}
 
-		public int ProcessHandle { get; }
-		public DataAccess(int handle)
+		public nuint ProcessHandle { get; }
+		public int ProcessId { get; }
+		public DataAccess(int pid, nuint handle)
 		{
+			ProcessId = pid;
 			ProcessHandle = handle;
 		}
 	}

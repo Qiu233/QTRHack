@@ -93,6 +93,9 @@ namespace QHackLib
 		public DataTarget DataTarget { get; }
 		public ClrRuntime Runtime { get; }
 		public AddressHelper MainAddressHelper { get; }
+		/// <summary>
+		/// aka mscorlib
+		/// </summary>
 		public AddressHelper BCLAddressHelper { get; }
 		public AddressHelper[] AddressHelpers { get; }
 		private Dictionary<string, AddressHelper> NameToAddressHelper { get; }

@@ -1,5 +1,5 @@
-﻿using Microsoft.Diagnostics.Runtime;
-using System;
+﻿using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -28,53 +28,33 @@ namespace QHackLib.Assemble
 
 		private unsafe static object[] ProcessUserArgs(object[] userArgs)
 		{
-			List<object> processedUserArgs = new List<object>();
+			List<object> processedUserArgs = new();
 			foreach (var arg in userArgs)
 			{
 				Type type = arg.GetType();
-				if (arg is IAddressableTypedEntity entity)//ClrObject or ClrValueType
-				{
-					if (arg is ClrValueType val)//ValueType
-					{
-						int size = val.Type.StaticSize - 8;
-						byte[] data = new byte[size];
-						val.Type.Module.AppDomain.Runtime.DataTarget.DataReader.Read(val.Address, new Span<byte>(data));
-						ClrType valType = val.Type;
-						if (size == 4 && valType.Fields.Length == 1 && valType.Fields[0].Type.IsPrimitive &&
-							!IsPTypePassingMustOnStack(valType.Name))
-							processedUserArgs.Add(BitConverter.ToInt32(data, 0));//int normal
-						else
-							processedUserArgs.Add(data);//byte[] on stack
-					}
-					else
-						processedUserArgs.Add((int)entity.Address);//int(ptr) normal
-				}
-				else if (type.IsValueType)
-				{
-					if (type.IsPrimitive)
-					{
-						processedUserArgs.Add(arg);//normal
-					}
-					else
-					{
-						int size = Marshal.SizeOf(type);
-						byte[] data = new byte[size];
-						IntPtr ptr = Marshal.AllocHGlobal(size);
-						Marshal.StructureToPtr(arg, ptr, false);
-						Marshal.Copy(ptr, data, 0, size);
-						Marshal.FreeHGlobal(ptr);
-						processedUserArgs.Add(data);//normal
-					}
-				}
-				else//ref
+				if (!type.IsValueType)
 					throw new ClrArgsPassingException($"Can only pass game object and value. Type: {type.FullName}");
+				if (type.IsPrimitive)
+				{
+					processedUserArgs.Add(arg);//normal
+				}
+				else
+				{
+					int size = Marshal.SizeOf(type);
+					byte[] data = new byte[size];
+					IntPtr ptr = Marshal.AllocHGlobal(size);
+					Marshal.StructureToPtr(arg, ptr, false);
+					Marshal.Copy(ptr, data, 0, size);
+					Marshal.FreeHGlobal(ptr);
+					processedUserArgs.Add(data);//normal
+				}
 			}
 			return processedUserArgs.ToArray();
 		}
 
 		private static AssemblyCode GetArugumentsPassing(int? thisPtr, int? retBuf, object[] userArgs)
 		{
-			AssemblySnippet snippet = new AssemblySnippet();
+			AssemblySnippet snippet = new();
 			int index = 0;
 			int reg = 0;
 			int stack = 0;
@@ -90,14 +70,13 @@ namespace QHackLib.Assemble
 				{
 					byte[] data = arg as byte[];
 					int count = (data.Length + 3) / 4;
-					byte[] targetData = new byte[count * 4];
+					byte[] targetData = ArrayPool<byte>.Shared.Rent(count * 4);
 					Array.Clear(targetData, 0, targetData.Length);//0
 					Array.Copy(data, targetData, data.Length);
 					for (int i = 0; i < count; i++)
-					{
 						snippet.Content.Add((Instruction)$"push {BitConverter.ToUInt32(targetData, (count - i - 1) * 4)}");
-					}
 					stack += count;
+					ArrayPool<byte>.Shared.Return(targetData);
 				}
 				else if (type.IsPrimitive)
 				{
@@ -151,7 +130,7 @@ namespace QHackLib.Assemble
 
 		public static AssemblySnippet FromClrCall(int targetAddr, bool regProtection, int? thisPtr, int? retBuf, params object[] arguments)
 		{
-			AssemblySnippet s = new AssemblySnippet();
+			AssemblySnippet s = new();
 			if (regProtection)
 			{
 				s.Content.Add(Instruction.Create("push ecx"));
@@ -194,25 +173,19 @@ namespace QHackLib.Assemble
 		}
 		#endregion
 
-		private static Random _random = new Random();
+		private static readonly Random _random = new();
 		public List<AssemblyCode> Content
 		{
 			get;
 		}
 
-		private AssemblySnippet()
-		{
-			Content = new List<AssemblyCode>();
-		}
+		private AssemblySnippet() => Content = new List<AssemblyCode>();
 
-		public static AssemblySnippet FromEmpty()
-		{
-			return new AssemblySnippet();
-		}
+		public static AssemblySnippet FromEmpty() => new();
 
 		public static AssemblySnippet FromASMCode(string asm)
 		{
-			AssemblySnippet s = new AssemblySnippet();
+			AssemblySnippet s = new();
 			s.Content.AddRange(
 				asm.Split(new string[] { "\n" }, StringSplitOptions.RemoveEmptyEntries)
 				.Select(t => Instruction.Create(t)));
@@ -221,7 +194,7 @@ namespace QHackLib.Assemble
 
 		public static AssemblySnippet FromCode(IEnumerable<AssemblyCode> code)
 		{
-			AssemblySnippet s = new AssemblySnippet();
+			AssemblySnippet s = new();
 			s.Content.AddRange(code);
 			return s;
 		}
@@ -290,19 +263,12 @@ namespace QHackLib.Assemble
 			return FromClrCall(loadFrom, false, null, null, assemblyFileNamePtr);
 		}
 
-		public override string GetCode()
-		{
-			StringBuilder sb = new StringBuilder("");
-			Content.ForEach(s => sb.Append(s.GetCode() + "\n"));
-			return sb.ToString();
-		}
-		public override byte[] GetByteCode(int IP)
-		{
-			return Assembler.Assemble(GetCode(), IP);
-		}
+		public override string GetCode() => string.Join('\n', Content);
+		public override byte[] GetByteCode(nuint IP) => Assembler.Assemble(GetCode(), IP);
+
 		public AssemblySnippet Copy()
 		{
-			AssemblySnippet ss = new AssemblySnippet();
+			AssemblySnippet ss = new();
 			ss.Content.AddRange(Content);
 			return ss;
 		}

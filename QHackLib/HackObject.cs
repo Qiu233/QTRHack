@@ -1,5 +1,4 @@
-﻿using Microsoft.Diagnostics.Runtime;
-using Microsoft.Diagnostics.Runtime.Implementation;
+﻿using QHackCLR.Clr;
 using QHackLib;
 using System;
 using System.Collections.Generic;
@@ -15,16 +14,6 @@ namespace QHackLib
 {
 	public static class HackObjectExtension
 	{
-		private static readonly MethodInfo Method_GetElementAddress;
-		public static Func<ClrArray, int, int[], ulong> GetElementAddress
-		{
-			get;
-		}
-		static HackObjectExtension()
-		{
-			Method_GetElementAddress = typeof(ClrArray).GetMethod("GetElementAddress", BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(int), typeof(int[]) }, null);
-			GetElementAddress = (array, elementSize, indices) => (ulong)Method_GetElementAddress.Invoke(array, new object[] { elementSize, indices });
-		}
 		public static T GetValue<T>(this HackObject obj) where T : unmanaged
 		{
 			ClrType type = obj.InternalClrObject.Type;
@@ -38,20 +27,20 @@ namespace QHackLib
 			if (type.IsObjectReference)
 				throw new HackObject.HackObjectTypeException("Can't set value to ref types.", type.Name);
 			int len = Marshal.SizeOf<T>();
-			if (len != type.StaticSize - 8)
-				throw new HackObject.HackObjectSizeNotEqualException(type.StaticSize, len);
+			if (len != type.BaseSize - 8)
+				throw new HackObject.HackObjectSizeNotEqualException(type.BaseSize, (uint)len);
 			obj.Context.DataAccess.Write(obj.BaseAddress, value);
 		}
 	}
 	public class HackObject : DynamicObject, IEquatable<HackObject>
 	{
 		public Context Context { get; }
-		public IAddressableTypedEntity InternalClrObject { get; }
+		public AddressableTypedEntity InternalClrObject { get; }
 
-		public int BaseAddress => (int)InternalClrObject.Address;
+		public nuint BaseAddress => InternalClrObject.Address;
 		public ClrType ClrType => InternalClrObject.Type;
 
-		public HackObject(Context context, IAddressableTypedEntity clrObject)
+		public HackObject(Context context, AddressableTypedEntity clrObject)
 		{
 			Context = context;
 			InternalClrObject = clrObject;
@@ -59,41 +48,39 @@ namespace QHackLib
 
 		public int GetArrayRank()
 		{
-			if (!(InternalClrObject is ClrObject iobj) || !iobj.IsArray)
+			if (InternalClrObject is not ClrObject iobj || !iobj.IsArray)
 				throw new HackObjectTypeException($"Not an array.", InternalClrObject.Type.Name);
-			return iobj.AsArray().Rank;
+			return iobj.Type.Rank;
 		}
 
 		public int GetArrayLength()
 		{
-			if (!(InternalClrObject is ClrObject iobj) || !iobj.IsArray)
+			if (InternalClrObject is not ClrObject iobj || !iobj.IsArray)
 				throw new HackObjectTypeException($"Not an array.", InternalClrObject.Type.Name);
-			return iobj.AsArray().Length;
+			return iobj.GetLength();
 		}
 
 		public int GetArrayLength(int i)
 		{
-			if (!(InternalClrObject is ClrObject iobj) || !iobj.IsArray)
+			if (InternalClrObject is not ClrObject iobj || !iobj.IsArray)
 				throw new HackObjectTypeException($"Not an array.", InternalClrObject.Type.Name);
-			ClrArray array = iobj.AsArray();
-			if (array.Rank < i)
+			if (iobj.Type.Rank < i)
 				throw new HackObjectInvalidArgsException($"Not an {i} dimension array.");
-			return array.GetLength(i);
+			return iobj.GetLength(i);
 		}
 
 		public HackObject InternalGetIndex(object[] indexes)
 		{
-			if (!(InternalClrObject is ClrObject obj) || !obj.IsArray)
+			if (InternalClrObject is not ClrObject obj || !obj.IsArray)
 				throw new HackObjectTypeException($"Not an array.", InternalClrObject.Type.Name);
 			if (!indexes.ToList().TrueForAll(t => t is int))
 				throw new HackObjectInvalidArgsException("Invalid indexes, accepts only int[].");
 			int[] _indexes = indexes.Select(t => (int)t).ToArray();
-			ClrArray array = obj.AsArray();
-			int size = array.Type.ComponentSize;
-			if (array.Rank != _indexes.Length)
-				throw new HackObjectInvalidArgsException($"Invalid indexes, rank not equal. Expected: {array.Rank}");
-			IAddressableTypedEntity v = array.Type.ComponentType.IsObjectReference ? (IAddressableTypedEntity)array.GetObjectValue(_indexes) : array.GetStructValue(_indexes);
-			return new HackObject(Context, v);
+			uint size = obj.Type.ComponentSize;
+			int rank = obj.Type.Rank;
+			if (rank != _indexes.Length)
+				throw new HackObjectInvalidArgsException($"Invalid indexes, rank not equal. Expected: {rank}");
+			return new HackObject(Context, obj.GetArrayElement(_indexes));
 		}
 
 		public override bool TryGetIndex(GetIndexBinder binder, object[] indexes, out object result)
@@ -104,36 +91,37 @@ namespace QHackLib
 
 		public void InternalSetIndex(object[] indexes, object value)
 		{
-			if (!(InternalClrObject is ClrObject iobj) || !iobj.IsArray)
+			if (InternalClrObject is not ClrObject iobj || !iobj.IsArray)
 				throw new HackObjectTypeException($"Not an array.", InternalClrObject.Type.Name);
 			if (!indexes.ToList().TrueForAll(t => t is int))
 				throw new HackObjectInvalidArgsException("Invalid indexes, accepts only int[].");
 			Type valueType = value.GetType();
 			int[] _indexes = indexes.Select(t => (int)t).ToArray();
-			ClrArray array = iobj.AsArray();
-			ClrType componentType = array.Type.ComponentType;
-			if (array.Rank != _indexes.Length)
-				throw new HackObjectInvalidArgsException($"Invalid indexes, rank not equal. Expected: {array.Rank}");
+			ClrType iobjType = iobj.Type;
+			ClrType componentType = iobjType.ComponentType;
+			int rank = iobjType.Rank;
+			if (iobjType.Rank != _indexes.Length)
+				throw new HackObjectInvalidArgsException($"Invalid indexes, rank not equal. Expected: {rank}");
 			if (value is ClrObject obj)
 			{
 				if (obj.Type != componentType)
 					throw new HackObjectTypeException($"Not the same ref type as {componentType.Name}.", obj.Type.Name);
-				Context.DataAccess.Write((int)HackObjectExtension.GetElementAddress(array, 4, _indexes), (int)obj.Address);
+				Context.DataAccess.Write(iobj.GetArrayElementAddress(_indexes), (int)obj.Address);
 			}
-			else if (value is ClrValueType val)
+			else if (value is ClrValue val)
 			{
-				int size = array.Type.ComponentSize;
-				if (val.Type.StaticSize - 8 != size)
-					throw new HackObjectSizeNotEqualException(size, val.Type.StaticSize);
-				byte[] data = Context.DataAccess.ReadBytes((int)val.Address, size);
-				Context.DataAccess.WriteBytes((int)HackObjectExtension.GetElementAddress(array, size, _indexes), data);
+				uint size = iobjType.ComponentSize;
+				if (val.Type.BaseSize - 8 != size)
+					throw new HackObjectSizeNotEqualException(size, val.Type.BaseSize);
+				byte[] data = Context.DataAccess.ReadBytes(val.Address, (int)size);
+				Context.DataAccess.WriteBytes(iobj.GetArrayElementAddress(_indexes), data);
 			}
 			else if (valueType.IsValueType)
 			{
 				int size = Marshal.SizeOf(valueType);
-				if (size != array.Type.ComponentSize)
-					throw new HackObjectSizeNotEqualException(array.Type.ComponentSize, size);
-				Context.DataAccess.Write((int)HackObjectExtension.GetElementAddress(array, 4, _indexes), value);
+				if (size != iobjType.ComponentSize)
+					throw new HackObjectSizeNotEqualException(iobjType.ComponentSize, (uint)size);
+				Context.DataAccess.Write(iobj.GetArrayElementAddress(_indexes), value);
 			}
 			else
 			{
@@ -149,7 +137,7 @@ namespace QHackLib
 
 		public HackObject InternalGetMember(string name)
 		{
-			return new HackObject(Context, InternalClrObject.GetFieldFrom(name));
+			return new HackObject(Context, InternalClrObject.GetFieldValue(name));
 		}
 
 		public override bool TryGetMember(GetMemberBinder binder, out object result)
@@ -161,29 +149,29 @@ namespace QHackLib
 		public void InternalSetMember(string name, object value)
 		{
 			Type valueType = value.GetType();
-			ClrInstanceField field = InternalClrObject.Type.GetFieldByName(name);
-			if (value is IAddressableTypedEntity entity && entity.Type != field.Type)
+			ClrInstanceField field = InternalClrObject.Type.GetInstanceFieldByName(name);
+			if (value is AddressableTypedEntity entity && entity.Type != field.Type)
 				throw new HackObjectTypeException($"Not the same type as {field.Type.Name}.", entity.Type.Name);
 			if (value is ClrObject obj)
 			{
 				if (obj.Type != field.Type)
 					throw new HackObjectTypeException($"Not the same ref type as {field.Type.Name}.", obj.Type.Name);
-				Context.DataAccess.Write((int)field.GetAddress(InternalClrObject.Address), (int)obj.Address);
+				Context.DataAccess.Write(field.GetAddress(InternalClrObject.Address), (int)obj.Address);
 			}
-			else if (value is ClrValueType val)
+			else if (value is ClrValue val)
 			{
-				int size = val.Type.StaticSize - 8;
-				if (size != field.Type.StaticSize - 8)
-					throw new HackObjectSizeNotEqualException(field.Type.StaticSize, size);
-				byte[] data = Context.DataAccess.ReadBytes((int)val.Address, size);
-				Context.DataAccess.WriteBytes((int)field.GetAddress(InternalClrObject.Address), data);
+				uint size = val.Type.BaseSize - 8;
+				if (size != field.Type.BaseSize - 8)
+					throw new HackObjectSizeNotEqualException(field.Type.BaseSize, size);
+				byte[] data = Context.DataAccess.ReadBytes(val.Address, (int)size);
+				Context.DataAccess.WriteBytes(field.GetAddress(InternalClrObject.Address), data);
 			}
 			else if (valueType.IsValueType)//except ClrObject/ClrValueType
 			{
 				int size = Marshal.SizeOf(valueType);
-				if (size != field.Type.StaticSize - 8)
-					throw new HackObjectSizeNotEqualException(field.Type.StaticSize, size);
-				Context.DataAccess.Write((int)field.GetAddress(InternalClrObject.Address), value);
+				if (size != field.Type.BaseSize - 8)
+					throw new HackObjectSizeNotEqualException(field.Type.BaseSize, (uint)size);
+				Context.DataAccess.Write(field.GetAddress(InternalClrObject.Address), value);
 			}
 			else
 			{
@@ -197,36 +185,9 @@ namespace QHackLib
 			return true;
 		}
 
-		/*public object InternalInvokeMember(string name, object[] args)
-		{
-			if (args.Length == 0)//default
-			{
-				return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Name == name)).Call(InternalClrObject);
-			}
-			else if (args.Length == 1)//filter
-			{
-				object arg0 = args[0];
-				if (arg0 is Func<ClrMethod, bool> filter)
-					return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => filter(t))).Call(InternalClrObject);
-				else if (arg0 is string sig)
-					return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Signature == sig)).Call(InternalClrObject);
-				else
-					throw new HackObjectInvalidArgsException("Unexpected arg when trying to get a method, accepts only a filter or a signature string.");
-			}
-			else
-			{
-				throw new HackObjectInvalidArgsException("More than 1 args when trying to get a method, accepts only a filter or a signature string.");
-			}
-		}*/
 
-		public HackMethodCall GetMethodCall(string sig)
-		{
-			return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => t.Signature == sig)).Call(InternalClrObject);
-		}
-		public HackMethodCall GetMethodCall(Func<ClrMethod, bool> filter)
-		{
-			return new HackMethod(Context, InternalClrObject.Type.Methods.First(t => filter(t))).Call(InternalClrObject);
-		}
+		public HackMethodCall GetMethodCall(string sig) => new HackMethod(Context, InternalClrObject.Type.MethodsInVTable.First(t => t.Signature == sig)).Call(InternalClrObject);
+		public HackMethodCall GetMethodCall(Func<ClrMethod, bool> filter) => new HackMethod(Context, InternalClrObject.Type.MethodsInVTable.First(t => filter(t))).Call(InternalClrObject);
 
 		public object InternalConvert(Type type)
 		{
@@ -235,10 +196,10 @@ namespace QHackLib
 			return Context.DataAccess.Read(type, BaseAddress);
 		}
 
-		public T InternalConvert<T>() where T : unmanaged
-		{
-			return Context.DataAccess.Read<T>(BaseAddress);
-		}
+		public T InternalConvert<T>() where T : unmanaged => Context.DataAccess.Read<T>(BaseAddress);
+		public bool Equals(HackObject other) => InternalClrObject.Equals(other?.InternalClrObject);
+		public override bool Equals(object obj) => Equals(obj as HackObject);
+		public override int GetHashCode() => InternalClrObject.GetHashCode();
 
 		public override bool TryConvert(ConvertBinder binder, out object result)
 		{
@@ -246,20 +207,6 @@ namespace QHackLib
 			return true;
 		}
 
-		public bool Equals(HackObject other)
-		{
-			return InternalClrObject.Equals(other?.InternalClrObject);
-		}
-
-		public override bool Equals(object obj)
-		{
-			return Equals(obj as HackObject);
-		}
-
-		public override int GetHashCode()
-		{
-			return InternalClrObject.GetHashCode();
-		}
 
 		public static bool operator ==(HackObject a, HackObject b)
 		{
@@ -267,10 +214,7 @@ namespace QHackLib
 				return b == null;
 			return a.Equals(b);
 		}
-		public static bool operator !=(HackObject a, HackObject b)
-		{
-			return !(a == b);
-		}
+		public static bool operator !=(HackObject a, HackObject b) => !(a == b);
 
 		internal abstract class HackObjectException : Exception
 		{
@@ -290,7 +234,7 @@ namespace QHackLib
 		}
 		internal class HackObjectSizeNotEqualException : HackObjectException
 		{
-			public HackObjectSizeNotEqualException(int expected, int got) : base($"Size not equal. expected {expected}, however, got {got}.") { }
+			public HackObjectSizeNotEqualException(uint expected, uint got) : base($"Size not equal. expected {expected}, however, got {got}.") { }
 		}
 	}
 }

@@ -24,7 +24,7 @@ namespace QHackLib.Assemble
 		{
 			return Code;
 		}
-		public override byte[] GetByteCode(int ip)
+		public override byte[] GetByteCode(nuint ip)
 		{
 			return Assembler.Assemble(Code, ip);
 		}

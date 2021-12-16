@@ -1,4 +1,5 @@
-﻿using QHackLib.Assemble;
+﻿using QHackCLR.DataTargets;
+using QHackLib.Assemble;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,12 +13,12 @@ namespace QHackLib.FunctionHelper
 	{
 		[DllImport("kernel32.dll")]
 		internal static extern IntPtr CreateRemoteThread(
-			int hProcess,
-			int lpThreadAttributes,
+			nuint hProcess,
+			nuint lpThreadAttributes,
 			int dwStackSize,
-			int lpStartAddress, // in remote process
-			int lpParameter,
-			int dwCreationFlags,
+			nuint lpStartAddress, // in remote process
+			nuint lpParameter,
+			uint dwCreationFlags,
 			out int lpThreadId
 		);
 		private readonly RemoteThreadHeader Header;
@@ -26,8 +27,8 @@ namespace QHackLib.FunctionHelper
 		/// Indicates whether the code memory can be safely released.<br/>
 		/// Note that this 
 		/// </summary>
-		public int SafeFreeFlagAddress => Header.Address_SafeFreeFlag;
-		public int CodeAddress => Header.Address_Code;
+		public nuint SafeFreeFlagAddress => Header.Address_SafeFreeFlag;
+		public nuint CodeAddress => Header.Address_Code;
 
 		public Context Context
 		{
@@ -47,7 +48,7 @@ namespace QHackLib.FunctionHelper
 				SafeFreeFlag = 1
 			};
 
-			Assembler assembler = new Assembler(Header.AllocationAddress);
+			Assembler assembler = new(Header.AllocationAddress);
 			assembler.Emit(DataAccess.GetBytes(Header));
 			assembler.Assemble($"mov dword ptr [{Header.Address_SafeFreeFlag}],1");
 			assembler.Assemble(asm);
@@ -57,16 +58,13 @@ namespace QHackLib.FunctionHelper
 		}
 
 		/// <summary>
-		/// Allocates space and fills the code in before calling <see cref="RemoteThread.RunOnNativeThread"/> to start a remote native thread.<br/>
-		/// To avoid a memory leak, call <see cref="RemoteThread.Dispose"/> to release the allocated space when the thread is not running.
+		/// Allocates space and fills the code in before calling <see cref="RunOnNativeThread"/> to start a remote native thread.<br/>
+		/// To avoid a memory leak, call <see cref="Dispose"/> to release the allocated space when the thread is not running.
 		/// </summary>
 		/// <param name="ctx"></param>
 		/// <param name="asm"></param>
 		/// <returns></returns>
-		public static RemoteThread Create(Context ctx, AssemblyCode asm)
-		{
-			return new RemoteThread(ctx, asm);
-		}
+		public static RemoteThread Create(Context ctx, AssemblyCode asm) => new RemoteThread(ctx, asm);
 
 		/// <summary>
 		/// Directly starts a remote native thread.<br/>
@@ -95,7 +93,7 @@ namespace QHackLib.FunctionHelper
 		/// </summary>
 		public void Dispose()
 		{
-			int sffAddr = Header.Address_SafeFreeFlag;
+			nuint sffAddr = Header.Address_SafeFreeFlag;
 			while (Context.DataAccess.Read<int>(sffAddr) != 0) { }
 			Context.DataAccess.FreeMemory(Header.AllocationAddress);
 		}
@@ -104,11 +102,11 @@ namespace QHackLib.FunctionHelper
 		private struct RemoteThreadHeader
 		{
 			public static readonly int HeaderSize = sizeof(RemoteThreadHeader);
-			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<RemoteThreadHeader>("SafeFreeFlag");
-			public int Address_Code => AllocationAddress + HeaderSize;
-			public int Address_SafeFreeFlag => AllocationAddress + Offset_SafeFreeFlag;
+			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<RemoteThreadHeader>(nameof(SafeFreeFlag));
+			public nuint Address_Code => AllocationAddress + (nuint)HeaderSize;
+			public nuint Address_SafeFreeFlag => AllocationAddress + (nuint)Offset_SafeFreeFlag;
 
-			public int AllocationAddress;
+			public nuint AllocationAddress;
 			public int SafeFreeFlag;
 		}
 	}

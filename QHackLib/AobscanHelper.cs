@@ -1,194 +1,108 @@
-﻿using QHackLib.Assemble;
+﻿using QHackCLR.DataTargets;
+using QHackLib.Assemble;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace QHackLib
 {
-	public class AobscanHelper
+	public unsafe class AobscanHelper
 	{
 		[StructLayout(LayoutKind.Sequential)]
 		private struct MEMORY_BASIC_INFORMATION
 		{
-			public int BaseAddress;
-			public int AllocationBase;
-			public int AllocationProtect;
-			public int RegionSize;
-			public int State;
+			public nuint BaseAddress;
+			public nuint AllocationBase;
+			public uint AllocationProtect;
+			public nuint RegionSize;
+			public uint State;
 			public DataAccess.ProtectionType Protect;
-			public int Type;
+			public uint Type;
 		}
 		[DllImport("kernel32.dll")]
 		private static extern int VirtualQueryEx
 		(
-			int hProcess,
-			int lpAddress,
+			nuint hProcess,
+			nuint lpAddress,
 			out MEMORY_BASIC_INFORMATION lpBuffer,
 			int dwLength
 		);
 
-		public static string GetMByteCode(int i)
+		internal static readonly int SIZE_MBI = sizeof(MEMORY_BASIC_INFORMATION);
+
+		public static string GetMByteCode(int i) => $"{i & 0xFF:X2}{(i >> 8) & 0xFF:X2}{(i >> 16) & 0xFF:X2}{(i >> 24) & 0xFF:X2}";
+		private static byte Ctoh(char hex) => hex switch
 		{
-			return string.Format("{0:X2}{1:X2}{2:X2}{3:X2}", i & 0xFF, (i >> 8) & 0xFF, (i >> 16) & 0xFF, (i >> 24) & 0xFF);
-		}
-		private static byte Ctoh(char hex)
-		{
-			if (hex >= '0' && hex <= '9')
-				return (byte)(hex - '0');
-			if (hex >= 'A' && hex <= 'F')
-				return (byte)(hex - 'A' + 10);
-			if (hex >= 'a' && hex <= 'f')
-				return (byte)(hex - 'a' + 10);
-			return 0;
-		}
+			>= '0' and <= '9' => (byte)(hex - '0'),
+			>= 'A' and <= 'F' => (byte)(hex - 'A' + 10),
+			>= 'a' and <= 'f' => (byte)(hex - 'a' + 10),
+			_ => 0
+		};
+
 		public static byte[] GetHexCodeFromString(string str)
 		{
-			List<byte> bs = new List<byte>();
-
-			char[] a = str.ToCharArray();
-			byte t = 0;
-			bool flag = false;
-			for (int i = 0; i < a.Length; i++)
-			{
-				if (a[i] != ' ')
-				{
-					if (flag)
-					{
-						bs.Add((byte)(t * 0x10 + Ctoh(a[i])));
-					}
-					t = Ctoh(a[i]);
-					flag = !flag;
-				}
-			}
-			return bs.ToArray();
+			var src = str.Where(c => !char.IsWhiteSpace(c)).Select(c => Ctoh(c));
+			return (src.Count() % 2) == 0
+				? src.Where((c, i) => i % 2 == 0).Zip(src.Where((c, i) => i % 2 == 1), (i, j) => (byte)((i * 0x10) + j)).ToArray()
+				: throw new ArgumentException("Not a valid hex string. A hex string should have a even length.", nameof(str));
 		}
 
-		public static int Memmem(byte[] a, int alen, byte[] b, int blen)
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static bool Match(in ReadOnlySpan<byte> src, in ReadOnlySpan<byte> sub)
 		{
-			int i, j;
-			for (i = 0; i < alen - blen; ++i)
-			{
-				for (j = 0; j < blen; ++j)
-					if (a[i + j] != b[j])
-						break;
-				if (j >= blen)
-					return i;
-			}
+			for (int i = 0; i < src.Length; i++)
+				if (src[i] != sub[i])
+					return false;
+			return true;
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="src"></param>
+		/// <param name="sub"></param>
+		/// <param name="pos"></param>
+		/// <returns>-1 if nothing was found</returns>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public static int Search(in ReadOnlySpan<byte> src, in ReadOnlySpan<byte> sub, ref int pos)
+		{
+			int bLen = sub.Length;
+			int len = src.Length - sub.Length;
+			for (; pos < len; pos++)
+				if (Match(src.Slice(pos, bLen), sub))
+					return pos;
 			return -1;
 		}
 
-		public static int AobscanASM(int handle, string asm)
+		public static IReadOnlyList<nuint> Aobscan(nuint handle, in ReadOnlySpan<byte> aob)
 		{
-			return Aobscan(handle, Assembler.Assemble(asm, 0));
-		}
-
-		public static int Aobscan(int handle, string hexCode, bool matching = false, int block = 0)
-		{
-			if (!matching)
+			List<nuint> result = new();
+			nuint addr = 0;
+			while (true)
 			{
-				byte[] bytes = GetHexCodeFromString(hexCode);
-				return Aobscan(handle, bytes, block);
-			}
-			int i = 0;
-			Dictionary<int, byte> pattern = new Dictionary<int, byte>();
-			List<int> match = new List<int>();
-			foreach (var c in hexCode)
-			{
-				if (c == ' ') continue;
-				else if (c == '*' || i == '?')
-				{
-					if (!matching)
-						throw new Exception("Not in maching mode");
-					match.Add(i++);
-				}
-				else
-					pattern[i++] = Convert.ToByte(c.ToString(), 16);
-			}
-			return AobscanMatch(handle, pattern, match, block);
-		}
-		private static int AobscanMatch(int handle, Dictionary<int, byte> pattern, List<int> match, int block = 0)
-		{
-			int i = block;
-			while (i < 0x7FFFFFFF)
-			{
-				int flag = VirtualQueryEx(handle, i, out MEMORY_BASIC_INFORMATION mbi, 28);
-				if (flag != 28)
+				int size = VirtualQueryEx(handle, addr, out MEMORY_BASIC_INFORMATION mbi, SIZE_MBI);
+				if (size != SIZE_MBI || mbi.RegionSize <= 0)
 					break;
-				if (mbi.RegionSize <= 0)
-					break;
-				if (mbi.Protect != DataAccess.ProtectionType.PAGE_EXECUTE_READWRITE || mbi.State != 0x00001000)
+				if (!mbi.Protect.HasFlag(DataAccess.ProtectionType.PAGE_EXECUTE_READWRITE)
+					|| !((DataAccess.AllocationType)mbi.State).HasFlag(DataAccess.AllocationType.MEM_COMMIT))
 				{
-					i = mbi.BaseAddress + mbi.RegionSize;
+					addr = mbi.BaseAddress + mbi.RegionSize;
 					continue;
 				}
-				byte[] va = new byte[mbi.RegionSize];
+				byte[] va = ArrayPool<byte>.Shared.Rent((int)mbi.RegionSize);
 				DataAccess.ReadProcessMemory(handle, mbi.BaseAddress, va, mbi.RegionSize, 0);
-				int r = MemmemMatch(va, pattern, match);
-				if (r >= 0)
-				{
-					return mbi.BaseAddress + r;
-				}
-				i = mbi.BaseAddress + mbi.RegionSize;
+				int pos = 0;
+				if (Search(va, aob, ref pos) >= 0)
+					result.Add(mbi.BaseAddress + (uint)pos);
+				ArrayPool<byte>.Shared.Return(va);
+				addr = mbi.BaseAddress + mbi.RegionSize;
 			}
-			return -1;
-		}
-		private static int MemmemMatch(byte[] v, Dictionary<int, byte> pattern, List<int> match)
-		{
-			byte GetV(int i)
-			{
-				int j = v[i / 2];
-				if (i % 2 == 0)
-					return (byte)(j >> 4);
-				else
-					return (byte)(j & 0xF);
-			}
-			int alen = v.Length * 2;
-			int blen = pattern.Count + match.Count;
-
-			for (int i = 0; i < alen - blen; i++)
-			{
-				int j = 0;
-				for (; j < blen; j++)
-				{
-					byte t = GetV(i + j);
-					if (match.Contains(j) || t == pattern[j])
-						continue;
-					break;
-				}
-				if (j == blen && i % 2 == 0)
-					return i / 2;
-			}
-			return -1;
-		}
-
-		public static int Aobscan(int handle, byte[] aob, int blockToStart = 0)
-		{
-			int i = blockToStart;
-			while (i < 0x7FFFFFFF)
-			{
-				int flag = VirtualQueryEx(handle, i, out MEMORY_BASIC_INFORMATION mbi, 28);
-				if (flag != 28)
-					break;
-				if (mbi.RegionSize <= 0)
-					break;
-				if (mbi.Protect != DataAccess.ProtectionType.PAGE_EXECUTE_READWRITE || mbi.State != 0x00001000)
-				{
-					i = mbi.BaseAddress + mbi.RegionSize;
-					continue;
-				}
-				byte[] va = new byte[mbi.RegionSize];
-				DataAccess.ReadProcessMemory(handle, mbi.BaseAddress, va, mbi.RegionSize, 0);
-				int r = Memmem(va, mbi.RegionSize, aob, aob.Length);
-				if (r >= 0)
-				{
-					return mbi.BaseAddress + r;
-				}
-				i = mbi.BaseAddress + mbi.RegionSize;
-			}
-			return -1;
+			return result;
 		}
 	}
 }

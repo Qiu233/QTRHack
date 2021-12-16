@@ -9,7 +9,7 @@ namespace QHackLib.Assemble
 	public abstract class AssemblyCode
 	{
 		public abstract string GetCode();
-		public abstract byte[] GetByteCode(int ip);
+		public abstract byte[] GetByteCode(nuint ip);
 		public override string ToString() => GetCode();
 	}
 }

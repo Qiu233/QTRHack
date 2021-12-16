@@ -16,9 +16,9 @@ namespace QHackLib.Assemble
 		{
 			get => InternalData;
 		}
-		private int _IP;
-		public int IP => _IP;
-		public Assembler(int IP)
+		private nuint _IP;
+		public nuint IP => _IP;
+		public Assembler(nuint IP)
 		{
 			_IP = IP;
 			InternalData = new List<byte>();
@@ -33,7 +33,7 @@ namespace QHackLib.Assemble
 			lock (InternalData)
 			{
 				InternalData.AddRange(data);
-				_IP += data.Length;
+				_IP += (uint)data.Length;
 			}
 		}
 		public void Assemble(string code) => Emit(Assemble(code, IP));
@@ -41,13 +41,11 @@ namespace QHackLib.Assemble
 		public byte[] GetByteCode() => InternalData.ToArray();
 
 
-		public unsafe static byte[] Assemble(string code, int IP)
+		public unsafe static byte[] Assemble(string code, nuint IP)
 		{
-			using (Engine keystone = new Engine(Keystone.Architecture.X86, Mode.X32) { ThrowOnError = true })
-			{
-				EncodedData enc = keystone.Assemble(code, (ulong)IP);
-				return enc.Buffer;
-			}
+			using Engine keystone = new(Keystone.Architecture.X86, Mode.X32) { ThrowOnError = true };
+			EncodedData enc = keystone.Assemble(code, IP);
+			return enc.Buffer;
 		}
 	}
 }

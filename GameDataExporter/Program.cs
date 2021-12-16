@@ -66,6 +66,7 @@ namespace GameDataExporter
 			fields.ForEach(t =>
 			{
 				string typeName;
+#pragma warning disable CA1416
 				using (var provider = new CSharpCodeProvider())
 					typeName = provider.GetTypeOutput(new CodeTypeReference(t.Type.Name));
 				sw.WriteLine(string.Format("\t\t<# PROPERTY_VIRTUAL(\"{0,-10}\", \"{1,-20}\"); #>", typeName, t.Name));

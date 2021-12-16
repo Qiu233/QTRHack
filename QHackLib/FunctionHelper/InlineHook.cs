@@ -1,4 +1,5 @@
-﻿using QHackLib.Assemble;
+﻿using QHackCLR.DataTargets;
+using QHackLib.Assemble;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,20 +14,20 @@ namespace QHackLib.FunctionHelper
 		[StructLayout(LayoutKind.Sequential)]
 		public unsafe struct HookInfo
 		{
-			public const int RawCodeBytesLength = 20;
+			public const int RAW_CODE_BYTES_LENGTH = 20;
 			public static readonly int HeaderSize = sizeof(HookInfo);
-			public static readonly int Offset_OnceFlag = (int)Marshal.OffsetOf<HookInfo>("OnceFlag");
-			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<HookInfo>("SafeFreeFlag");
-			public static readonly int Offset_RawCodeLength = (int)Marshal.OffsetOf<HookInfo>("RawCodeLength");
-			public static readonly int Offset_RawCodeBytes = (int)Marshal.OffsetOf<HookInfo>("RawCodeBytes");
+			public static readonly int Offset_OnceFlag = (int)Marshal.OffsetOf<HookInfo>(nameof(OnceFlag));
+			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<HookInfo>(nameof(SafeFreeFlag));
+			public static readonly int Offset_RawCodeLength = (int)Marshal.OffsetOf<HookInfo>(nameof(RawCodeLength));
+			public static readonly int Offset_RawCodeBytes = (int)Marshal.OffsetOf<HookInfo>(nameof(RawCodeBytes));
 
-			public int Address_Code => AllocationAddress + HeaderSize;
-			public int Address_OnceFlag => AllocationAddress + Offset_OnceFlag;
-			public int Address_SafeFreeFlag => AllocationAddress + Offset_SafeFreeFlag;
-			public int Address_RawCodeLength => AllocationAddress + Offset_RawCodeLength;
-			public int Address_RawCodeBytes => AllocationAddress + Offset_RawCodeBytes;
+			public nuint Address_Code => AllocationAddress + (uint)HeaderSize;
+			public nuint Address_OnceFlag => AllocationAddress + (uint)Offset_OnceFlag;
+			public nuint Address_SafeFreeFlag => AllocationAddress + (uint)Offset_SafeFreeFlag;
+			public nuint Address_RawCodeLength => AllocationAddress + (uint)Offset_RawCodeLength;
+			public nuint Address_RawCodeBytes => AllocationAddress + (uint)Offset_RawCodeBytes;
 
-			public HookInfo(int allocationAddress, int onceFlag, int safeFreeFlag, byte[] rawCodeBytes)
+			public HookInfo(nuint allocationAddress, int onceFlag, int safeFreeFlag, byte[] rawCodeBytes)
 			{
 				AllocationAddress = allocationAddress;
 				OnceFlag = onceFlag;
@@ -36,11 +37,11 @@ namespace QHackLib.FunctionHelper
 					RawCodeBytes[i] = rawCodeBytes[i];
 			}
 
-			public int AllocationAddress;
+			public nuint AllocationAddress;
 			public int OnceFlag;
 			public int SafeFreeFlag;
 			public int RawCodeLength;
-			public fixed byte RawCodeBytes[RawCodeBytesLength];
+			public fixed byte RawCodeBytes[RAW_CODE_BYTES_LENGTH];
 		}
 
 		private static byte[] GetHeadBytes(byte[] code)
@@ -69,27 +70,27 @@ namespace QHackLib.FunctionHelper
 			return v;
 		}
 
-		public static void HookAndWait(Context Context, AssemblyCode code, int targetAddr, bool once)
+		public static void HookAndWait(Context Context, AssemblyCode code, nuint targetAddr, bool once)
 		{
 			HookInfo hookInfo = Hook(Context, code, targetAddr, once);
 			System.Threading.Thread.Sleep(10);
-			int sffAddr = hookInfo.Address_SafeFreeFlag;
-			int ofAddr = hookInfo.Address_OnceFlag;
+			nuint sffAddr = hookInfo.Address_SafeFreeFlag;
+			nuint ofAddr = hookInfo.Address_OnceFlag;
 			while (Context.DataAccess.Read<int>(sffAddr) != 0 ||
 					Context.DataAccess.Read<int>(ofAddr) != 0) { }
 			Context.DataAccess.Write(targetAddr, hookInfo.RawCodeBytes, hookInfo.RawCodeLength);
 			Context.DataAccess.FreeMemory(hookInfo.AllocationAddress);
 		}
 
-		public static void FreeHook(Context Context, int targetAddr)
+		public static void FreeHook(Context Context, nuint targetAddr)
 		{
-			int k = targetAddr;
+			nuint k = targetAddr;
 
 			byte h = Context.DataAccess.Read<byte>(targetAddr);
 			if (h != 0xE9) throw new ArgumentException("Not a hooked target");
 
 			int j = Context.DataAccess.Read<int>(targetAddr + 1);
-			k += j + 5 - HookInfo.HeaderSize;
+			k += (uint)(j + 5 - HookInfo.HeaderSize);
 			HookInfo info = Context.DataAccess.Read<HookInfo>(k);
 
 			Context.DataAccess.Write(targetAddr, info.RawCodeBytes, info.RawCodeLength);
@@ -103,7 +104,7 @@ namespace QHackLib.FunctionHelper
 		/// <param name="rawAddr"></param>
 		/// <param name="targetAddr"></param>
 		/// <returns></returns>
-		private static byte[] ProcessJmps(byte[] insts, int rawAddr, int targetAddr)
+		private static byte[] ProcessJmps(byte[] insts, nuint rawAddr, nuint targetAddr)
 		{
 			IntPtr ptr3 = Marshal.AllocHGlobal(insts.Length);
 			Marshal.Copy(insts, 0, ptr3, insts.Length);
@@ -114,7 +115,7 @@ namespace QHackLib.FunctionHelper
 				while (i - p < insts.Length)
 				{
 					if (*i == 0xe9 || *i == 0xe8)//jmp or call
-						*((int*)(i + 1)) += rawAddr - targetAddr;//move the call
+						*((int*)(i + 1)) += (int)(rawAddr - targetAddr);//move the call
 					Ldasm.ldasm_data data = new Ldasm.ldasm_data();
 					uint t = Ldasm.ldasm(i, ref data, false);
 					i += t;
@@ -126,7 +127,7 @@ namespace QHackLib.FunctionHelper
 			return result;
 		}
 
-		private static AssemblyCode GetOnceCheckedCode(AssemblyCode code, int onceFlagAddr)
+		private static AssemblyCode GetOnceCheckedCode(AssemblyCode code, nuint onceFlagAddr)
 		{
 			AssemblySnippet result = AssemblySnippet.FromEmpty();
 			result.Content.Add(Instruction.Create("cmp dword ptr [" + onceFlagAddr + "],0"));
@@ -147,19 +148,19 @@ namespace QHackLib.FunctionHelper
 		/// <param name="execRaw"></param>
 		/// <param name="size"></param>
 		/// <returns></returns>
-		public static HookInfo Hook(Context Context, AssemblyCode code, int targetAddr, bool once, bool execRaw = true, int size = 1024)
+		public static HookInfo Hook(Context Context, AssemblyCode code, nuint targetAddr, bool once, bool execRaw = true, int size = 1024)
 		{
 			byte[] headInstBytes = GetHeadBytes(Context.DataAccess.ReadBytes(targetAddr, 32));
 
-			int allocAddr = Context.DataAccess.AllocMemory(size);
-			int safeFreeFlagAddr = allocAddr + HookInfo.Offset_SafeFreeFlag;
-			int onceFlagAddr = allocAddr + HookInfo.Offset_OnceFlag;
-			int codeAddr = allocAddr + HookInfo.HeaderSize;
-			int retAddr = targetAddr + headInstBytes.Length;
+			nuint allocAddr = Context.DataAccess.AllocMemory(size);
+			nuint safeFreeFlagAddr = allocAddr + (uint)HookInfo.Offset_SafeFreeFlag;
+			nuint onceFlagAddr = allocAddr + (uint)HookInfo.Offset_OnceFlag;
+			nuint codeAddr = allocAddr + (uint)HookInfo.HeaderSize;
+			nuint retAddr = targetAddr + (uint)headInstBytes.Length;
 
-			HookInfo info = new HookInfo(allocAddr, 1, 1, headInstBytes);
+			HookInfo info = new(allocAddr, 1, 1, headInstBytes);
 
-			Assembler assembler = new Assembler(allocAddr);
+			Assembler assembler = new(allocAddr);
 			assembler.Emit(DataAccess.GetBytes(info));//emit the header before runnable code
 			assembler.Assemble($"mov dword ptr [{safeFreeFlagAddr}],1");
 			assembler.Assemble(once ? GetOnceCheckedCode(code, onceFlagAddr) : code);//once or not

@@ -1,4 +1,4 @@
-﻿using Microsoft.Diagnostics.Runtime;
+﻿using QHackCLR.Clr;
 using QHackLib.Assemble;
 using System;
 using System.Collections.Generic;
@@ -26,7 +26,7 @@ namespace QHackLib
 		{
 			return AssemblySnippet.FromClrCall((int)InternalClrMethod.NativeCode, regProtection, thisPtr, retBuf, args);
 		}
-		public AssemblyCode Call(bool regProtection, IAddressableTypedEntity entity, int? retBuf, params object[] args)
+		public AssemblyCode Call(bool regProtection, AddressableTypedEntity entity, int? retBuf, params object[] args)
 		{
 			return Call(regProtection, (int)entity.Address, retBuf, args);
 		}
@@ -34,7 +34,7 @@ namespace QHackLib
 		{
 			return new HackMethodCall(this, thisPtr);
 		}
-		public HackMethodCall Call(IAddressableTypedEntity entity)
+		public HackMethodCall Call(AddressableTypedEntity entity)
 		{
 			return new HackMethodCall(this, entity);
 		}
@@ -78,7 +78,7 @@ namespace QHackLib
 			Method = method;
 			ThisPointer = thisPointer;
 		}
-		public HackMethodCall(HackMethod method, IAddressableTypedEntity entity)
+		public HackMethodCall(HackMethod method, AddressableTypedEntity entity)
 		{
 			Method = method;
 			ThisPointer = (int)entity.Address;

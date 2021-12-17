@@ -39,7 +39,6 @@ namespace QHackCLR.Clr.Builders
 		private readonly ConcurrentDictionary<nuint, ClrAppDomain> AppDomains = new();
 		private readonly ConcurrentDictionary<nuint, ClrModule> Modules = new();
 		private readonly ConcurrentDictionary<nuint, ClrType> Types = new();
-		private readonly ConcurrentDictionary<CorElementType, ClrType> BasicTypes = new();
 
 		public DacLibrary DacLibrary { get; }
 		public ClrInfo ClrInfo { get; }
@@ -59,7 +58,7 @@ namespace QHackCLR.Clr.Builders
 		public IClrObjectHelper ClrObjectHelper => this;
 		public IHeapHelper HeapHelper => this;
 
-		public RuntimeBuilder(ClrInfo clrInfo, DacLibrary dacCibrary)
+		internal RuntimeBuilder(ClrInfo clrInfo, DacLibrary dacCibrary)
 		{
 			ClrInfo = clrInfo;
 			DacLibrary = dacCibrary;
@@ -71,6 +70,14 @@ namespace QHackCLR.Clr.Builders
 			return from asm in SOSDac.GetAssemblyList(appDomain.ClrHandle)
 				   from module in SOSDac.GetAssemblyModuleList(appDomain.ClrHandle, asm)
 				   select GetModule(module);
+		}
+
+		public void Flush()
+		{
+			CLRDataProcess.Flush();
+			AppDomains.Clear();
+			Modules.Clear();
+			Types.Clear();
 		}
 
 		bool IFieldHelper.GetFieldProps(ClrType parentType, int token, out string name, out FieldAttributes attributes, out SigParser sigParser)
@@ -166,18 +173,6 @@ namespace QHackCLR.Clr.Builders
 				yield return new ClrMethod(this, chdata.MethodDescPtr);
 			}
 		}
-
-		public ClrType GetBasicType(CorElementType basicType)
-		{
-			if (BasicTypes.TryGetValue(basicType, out ClrType value))
-				return value;
-			ClrModule bcl = Runtime.BaseClassLibrary;
-			foreach (var type in bcl.DefinedTypes)
-				if (type.CorElementType == basicType)
-					return type;
-			return null;
-		}
-
 		#region GetOrCreates
 
 		public ClrAppDomain GetAppDomain(nuint handle) => TryGetCache(AppDomains, handle, t => new ClrAppDomain(this, t));

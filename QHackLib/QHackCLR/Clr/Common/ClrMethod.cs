@@ -31,6 +31,26 @@ namespace QHackCLR.Clr
 			Signature = helper.SOSDac.GetMethodDescName(handle);
 		}
 
+
+		public string Name
+		{
+			get
+			{
+				string signature = Signature;
+				if (signature is null)
+					return null;
+				int last = signature.LastIndexOf('(');
+				if (last > 0)
+				{
+					int first = signature.LastIndexOf('.', last - 1);
+					if (first != -1 && signature[first - 1] == '.')
+						first--;
+					return signature.Substring(first + 1, last - first - 1);
+				}
+				return "{error}";
+			}
+		}
+
 		#region
 		public ClrType _DeclaringType;
 		#endregion

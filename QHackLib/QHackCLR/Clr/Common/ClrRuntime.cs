@@ -17,17 +17,26 @@ namespace QHackCLR.Clr
 		protected nuint BaseAddress { get; }
 		protected IRuntimeHelper RuntimeHelper { get; }
 		public ClrInfo ClrInfo { get; }
-		public ClrHeap Heap { get; }
 		public ClrRuntime(ClrInfo clrInfo, IRuntimeHelper helper, nuint baseAddress)
 		{
 			ClrInfo = clrInfo;
 			RuntimeHelper = helper;
 			BaseAddress = baseAddress;
-			Heap = new ClrHeap(this, helper.HeapHelper);
-
 		}
 		public DataTarget DataTarget => ClrInfo.DataTarget;
 		public DacLibrary DacLibrary => RuntimeHelper.DacLibrary;
+
+		public void Flush()
+		{
+			_AppDomain = null;
+			_Heap = null;
+			RuntimeHelper.Flush();
+		}
+
+		private ClrAppDomain _AppDomain;
+
+		private ClrHeap _Heap;
+		public ClrHeap Heap => _Heap ??= new ClrHeap(this, RuntimeHelper.HeapHelper);
 
 
 		/// <summary>
@@ -37,7 +46,6 @@ namespace QHackCLR.Clr
 		/// <returns></returns>
 		public ClrModule BaseClassLibrary => Heap.ObjectType.Module;
 
-		private ClrAppDomain _AppDomain;
 		/// <summary>
 		/// Supports only one appdomain, CORE style.
 		/// </summary>

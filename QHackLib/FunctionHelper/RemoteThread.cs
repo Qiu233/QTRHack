@@ -5,11 +5,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace QHackLib.FunctionHelper
 {
-	public unsafe sealed class RemoteThread : IDisposable
+	public sealed class RemoteThread : IDisposable
 	{
 		[DllImport("kernel32.dll")]
 		internal static extern IntPtr CreateRemoteThread(
@@ -42,19 +43,15 @@ namespace QHackLib.FunctionHelper
 		private RemoteThread(Context ctx, AssemblyCode asm)
 		{
 			Context = ctx;
-			Header = new RemoteThreadHeader
-			{
-				AllocationAddress = Context.DataAccess.AllocMemory(),
-				SafeFreeFlag = 1
-			};
+			Header = new RemoteThreadHeader(Context.DataAccess.AllocMemory(), 1);
 
-			Assembler assembler = new(Header.AllocationAddress);
+			Assembler assembler = new();
 			assembler.Emit(DataAccess.GetBytes(Header));
-			assembler.Assemble($"mov dword ptr [{Header.Address_SafeFreeFlag}],1");
-			assembler.Assemble(asm);
-			assembler.Assemble($"mov dword ptr [{Header.Address_SafeFreeFlag}],0");
-			assembler.Assemble("ret");
-			Context.DataAccess.WriteBytes(Header.AllocationAddress, assembler.Data.ToArray());
+			assembler.Emit((Instruction)$"mov dword ptr [{Header.Address_SafeFreeFlag}],1");
+			assembler.Emit(asm);
+			assembler.Emit((Instruction)$"mov dword ptr [{Header.Address_SafeFreeFlag}],0");
+			assembler.Emit((Instruction)"ret");
+			Context.DataAccess.WriteBytes(Header.AllocationAddress, assembler.GetByteCode(Header.AllocationAddress));
 		}
 
 		/// <summary>
@@ -64,7 +61,7 @@ namespace QHackLib.FunctionHelper
 		/// <param name="ctx"></param>
 		/// <param name="asm"></param>
 		/// <returns></returns>
-		public static RemoteThread Create(Context ctx, AssemblyCode asm) => new RemoteThread(ctx, asm);
+		public static RemoteThread Create(Context ctx, AssemblyCode asm) => new(ctx, asm);
 
 		/// <summary>
 		/// Directly starts a remote native thread.<br/>
@@ -88,26 +85,52 @@ namespace QHackLib.FunctionHelper
 		}
 
 		/// <summary>
-		/// Calling this method will wait until the SafeFreeFlag become 0 before releasing the memory,<br/>
-		/// which ensures that the code will be executed at least once.
+		/// Checks if the code region is ready to be released,
+		/// Only when this method returns true can you dispose this object.
 		/// </summary>
-		public void Dispose()
+		/// <returns></returns>
+		public bool ReadyToRelease() => Context.DataAccess.Read<int>(Header.Address_SafeFreeFlag) == 0;
+
+		/// <summary>
+		/// Calling this method will forcefully release the code region, 
+		/// even when the code is being executed.
+		/// </summary>
+		public void Dispose() => Context.DataAccess.FreeMemory(Header.AllocationAddress);
+
+		/// <summary>
+		/// Waits to dispose until <see cref="ReadyToRelease"/> returns true, 
+		/// or the timeout is reached.
+		/// </summary>
+		/// <param name="timeout"></param>
+		/// <returns>true if disposed successfully, false otherwise.</returns>
+		public async Task<bool> WaitDispose(int timeout)
 		{
-			nuint sffAddr = Header.Address_SafeFreeFlag;
-			while (Context.DataAccess.Read<int>(sffAddr) != 0) { }
-			Context.DataAccess.FreeMemory(Header.AllocationAddress);
+			var wait = Task.Run(() =>
+			{
+				while (!ReadyToRelease()) ;
+				Dispose();
+			});
+			if (await Task.WhenAny(wait, Task.Delay(timeout)) == wait)
+				return true;
+			return false;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		private struct RemoteThreadHeader
+		private unsafe readonly struct RemoteThreadHeader
 		{
 			public static readonly int HeaderSize = sizeof(RemoteThreadHeader);
 			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<RemoteThreadHeader>(nameof(SafeFreeFlag));
 			public nuint Address_Code => AllocationAddress + (nuint)HeaderSize;
 			public nuint Address_SafeFreeFlag => AllocationAddress + (nuint)Offset_SafeFreeFlag;
 
-			public nuint AllocationAddress;
-			public int SafeFreeFlag;
+			public RemoteThreadHeader(nuint allocationAddress, int safeFreeFlag)
+			{
+				AllocationAddress = allocationAddress;
+				SafeFreeFlag = safeFreeFlag;
+			}
+
+			public readonly nuint AllocationAddress;
+			public readonly int SafeFreeFlag;
 		}
 	}
 }

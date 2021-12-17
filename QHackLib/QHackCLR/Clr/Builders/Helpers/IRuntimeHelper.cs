@@ -13,5 +13,6 @@ namespace QHackCLR.Clr.Builders.Helpers
 		DataAccess DataAccess { get; }
 		DacLibrary DacLibrary { get; }
 		ClrAppDomain GetAppDomain(nuint handle);
+		void Flush();
 	}
 }

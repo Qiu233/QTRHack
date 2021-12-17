@@ -59,16 +59,17 @@ namespace QHackLib
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
 		internal static extern bool CloseHandle(nuint hObject);
 
-		[DllImport("kernel32", CharSet = CharSet.Unicode)]
+		[DllImport("psapi.dll", CharSet = CharSet.Unicode)]
 		internal static extern bool EnumProcessModules(nuint hProcess, nuint* lphModule, uint cb, out uint lpcbNeeded);
 
 		[DllImport("psapi.dll", CharSet = CharSet.Unicode)]
 		internal static extern uint GetModuleFileNameEx(nuint hProcess, nuint hModule, [Out] StringBuilder lpBaseName, uint nSize);
 
-		[DllImport("kernel32", CharSet = CharSet.Unicode)]
+#pragma warning disable CA2101
+		[DllImport("kernel32", CharSet = CharSet.Ansi)]
 		internal static extern nuint LoadLibrary(string lpFileName);
 
-		[DllImport("kernel32", CharSet = CharSet.Unicode)]
+		[DllImport("kernel32", CharSet = CharSet.Ansi)]
 		internal static extern nuint GetProcAddress(nuint hModule, string procName);
 
 		[DllImport("kernel32.dll")]

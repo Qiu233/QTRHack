@@ -46,28 +46,13 @@ namespace QHackLib.FunctionHelper
 
 		private static byte[] GetHeadBytes(byte[] code)
 		{
-			IntPtr ptr3 = Marshal.AllocHGlobal(code.Length);
-			Marshal.Copy(code, 0, ptr3, code.Length);
-			uint len;
-			unsafe
+			fixed (byte* p = code)
 			{
-				byte* p = (byte*)ptr3.ToPointer();
 				byte* i = p;
 				while (i - p < 5)
-				{
-					Ldasm.ldasm_data data = new Ldasm.ldasm_data();
-					uint t = Ldasm.ldasm(i, ref data, false);
-					i += t;
-				}
-				len = (uint)(i - p);
+					i += Ldasm.GetInst(i, out _, false);
+				return code[..(int)(i - p)];
 			}
-			Marshal.FreeHGlobal(ptr3);
-			byte[] v = new byte[len];
-			for (int i = 0; i < len; i++)
-			{
-				v[i] = code[i];
-			}
-			return v;
 		}
 
 		public static void HookAndWait(Context Context, AssemblyCode code, nuint targetAddr, bool once)
@@ -95,36 +80,6 @@ namespace QHackLib.FunctionHelper
 
 			Context.DataAccess.Write(targetAddr, info.RawCodeBytes, info.RawCodeLength);
 			Context.DataAccess.FreeMemory(info.AllocationAddress);
-		}
-
-		/// <summary>
-		/// Repoint the jmps
-		/// </summary>
-		/// <param name="insts"></param>
-		/// <param name="rawAddr"></param>
-		/// <param name="targetAddr"></param>
-		/// <returns></returns>
-		private static byte[] ProcessJmps(byte[] insts, nuint rawAddr, nuint targetAddr)
-		{
-			IntPtr ptr3 = Marshal.AllocHGlobal(insts.Length);
-			Marshal.Copy(insts, 0, ptr3, insts.Length);
-			unsafe
-			{
-				byte* p = (byte*)ptr3;
-				byte* i = p;
-				while (i - p < insts.Length)
-				{
-					if (*i == 0xe9 || *i == 0xe8)//jmp or call
-						*((int*)(i + 1)) += (int)(rawAddr - targetAddr);//move the call
-					Ldasm.ldasm_data data = new Ldasm.ldasm_data();
-					uint t = Ldasm.ldasm(i, ref data, false);
-					i += t;
-				}
-			}
-			byte[] result = new byte[insts.Length];
-			Marshal.Copy(ptr3, result, 0, insts.Length);
-			Marshal.FreeHGlobal(ptr3);
-			return result;
 		}
 
 		private static AssemblyCode GetOnceCheckedCode(AssemblyCode code, nuint onceFlagAddr)
@@ -160,14 +115,14 @@ namespace QHackLib.FunctionHelper
 
 			HookInfo info = new(allocAddr, 1, 1, headInstBytes);
 
-			Assembler assembler = new(allocAddr);
+			Assembler assembler = new();
 			assembler.Emit(DataAccess.GetBytes(info));//emit the header before runnable code
-			assembler.Assemble($"mov dword ptr [{safeFreeFlagAddr}],1");
-			assembler.Assemble(once ? GetOnceCheckedCode(code, onceFlagAddr) : code);//once or not
+			assembler.Emit((Instruction)$"mov dword ptr [{safeFreeFlagAddr}],1");
+			assembler.Emit(once ? GetOnceCheckedCode(code, onceFlagAddr) : code);//once or not
 			if (execRaw)
-				assembler.Emit(ProcessJmps(headInstBytes, targetAddr, assembler.IP));//emit the raw code replaced by hook jmp
-			assembler.Assemble($"mov dword ptr [{safeFreeFlagAddr}],0");
-			assembler.Assemble("jmp " + retAddr);
+				assembler.Emit(headInstBytes);//emit the raw code replaced by hook jmp
+			assembler.Emit((Instruction)$"mov dword ptr [{safeFreeFlagAddr}],0");
+			assembler.Emit((Instruction)$"jmp {retAddr}");
 
 
 			byte[] jmpToBytesRaw = Assembler.Assemble($"jmp {codeAddr}", targetAddr);
@@ -176,8 +131,7 @@ namespace QHackLib.FunctionHelper
 				jmpToBytes[i] = jmpToBytesRaw[i];
 			for (int i = 5; i < headInstBytes.Length; i++)
 				jmpToBytes[i] = 0x90;//nop
-
-			Context.DataAccess.WriteBytes(allocAddr, assembler.Data.ToArray());
+			Context.DataAccess.WriteBytes(allocAddr, assembler.GetByteCode(allocAddr));
 			Context.DataAccess.WriteBytes(targetAddr, jmpToBytes);
 			return info;
 		}

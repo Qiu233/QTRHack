@@ -15,7 +15,7 @@ namespace QHackLib
 		public Context Context { get; }
 		public ClrModule Module { get; }
 		public string ModuleName { get => Module.Name; }
-		public int this[string TypeName, string FunctionName]
+		public nuint this[string TypeName, string FunctionName]
 		{
 			get => GetFunctionAddress(TypeName, FunctionName);
 		}
@@ -38,7 +38,7 @@ namespace QHackLib
 
 		public ClrMethod GetClrMethod(string TypeName, string MethodName)
 		{
-			ClrMethod[] methods = GetClrType(TypeName).MethodsInVTable.Where(t => t.Signature == MethodName).ToArray();
+			ClrMethod[] methods = GetClrType(TypeName).MethodsInVTable.Where(t => t.Name == MethodName).ToArray();
 			if (methods.Length == 0)
 				throw MakeArgNotFoundException<ClrMethod>("MethodName", MethodName);
 			return methods[0];
@@ -46,8 +46,8 @@ namespace QHackLib
 
 		public ClrMethod GetClrMethod(string TypeName, Func<ClrMethod, bool> filter) => GetClrType(TypeName).MethodsInVTable.First(t => filter(t));
 
-		public int GetFunctionAddress(string TypeName, string FunctionName) => (int)GetClrMethod(TypeName, FunctionName).NativeCode;
-		public int GetFunctionAddress(string TypeName, Func<ClrMethod, bool> filter) => (int)GetClrMethod(TypeName, t => filter(t)).NativeCode;
+		public nuint GetFunctionAddress(string TypeName, string FunctionName) => GetClrMethod(TypeName, FunctionName).NativeCode;
+		public nuint GetFunctionAddress(string TypeName, Func<ClrMethod, bool> filter) => GetClrMethod(TypeName, t => filter(t)).NativeCode;
 
 		//public ILToNativeMap GetFunctionInstruction(string TypeName, string FunctionName, int ILOffset) => GetClrType(TypeName).MethodsInVTable.First(t => t.Name == FunctionName).ILOffsetMap.First(t => t.ILOffset == ILOffset);
 

@@ -11,9 +11,6 @@ using System.Threading.Tasks;
 
 namespace QHackCLR.Clr
 {
-	/// <summary>
-	/// Fields are not cached.
-	/// </summary>
 	public abstract class ClrField : ClrEntity, IHasMetadata
 	{
 		public readonly DacpFieldDescData Data;

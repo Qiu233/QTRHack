@@ -12,19 +12,11 @@ namespace QHackLib.Assemble
 	public class AssemblySnippet : AssemblyCode
 	{
 		#region CLRCall
-		public static bool IsPTypePassingMustOnStack(string typeName)
+		public static bool IsPTypePassingMustOnStack(string typeName) => typeName switch
 		{
-			switch (typeName)
-			{
-				case "System.Int64":
-				case "System.UInt64":
-				case "System.Single":
-				case "System.Double":
-					return true;
-				default:
-					return false;
-			}
-		}
+			"System.Int64" or "System.UInt64" or "System.Single" or "System.Double" => true,
+			_ => false,
+		};
 
 		private unsafe static object[] ProcessUserArgs(object[] userArgs)
 		{
@@ -36,7 +28,11 @@ namespace QHackLib.Assemble
 					throw new ClrArgsPassingException($"Can only pass game object and value. Type: {type.FullName}");
 				if (type.IsPrimitive)
 				{
-					processedUserArgs.Add(arg);//normal
+					if ((type == typeof(nuint) || type == typeof(nint)) &&
+						(sizeof(nuint) == 4))
+						processedUserArgs.Add((uint)(nuint)arg);
+					else
+						processedUserArgs.Add(arg);//normal
 				}
 				else
 				{
@@ -52,7 +48,14 @@ namespace QHackLib.Assemble
 			return processedUserArgs.ToArray();
 		}
 
-		private static AssemblyCode GetArugumentsPassing(int? thisPtr, int? retBuf, object[] userArgs)
+		private static string SetReg(string reg, nuint val)
+		{
+			if (val == 0)
+				return $"xor {reg},{reg}";
+			return $"mov {reg},{val}";
+		}
+
+		private static AssemblyCode GetArugumentsPassing(nuint? thisPtr, nuint? retBuf, object[] userArgs)
 		{
 			AssemblySnippet snippet = new();
 			int index = 0;
@@ -60,9 +63,9 @@ namespace QHackLib.Assemble
 			int stack = 0;
 			object[] args = ProcessUserArgs(userArgs);
 			if (thisPtr != null)
-				snippet.Content.Add((Instruction)$"mov {(reg++ == 0 ? "ecx" : "edx")},{thisPtr.Value}");
+				snippet.Content.Add((Instruction)SetReg((reg++ == 0 ? "ecx" : "edx"), thisPtr.Value));
 			if (retBuf != null)
-				snippet.Content.Add((Instruction)$"mov {(reg++ == 0 ? "ecx" : "edx")},{retBuf.Value}");
+				snippet.Content.Add((Instruction)SetReg((reg++ == 0 ? "ecx" : "edx"), retBuf.Value));
 			foreach (var arg in args)
 			{
 				Type type = arg.GetType();
@@ -112,7 +115,7 @@ namespace QHackLib.Assemble
 						uint value = Convert.ToUInt32(arg);
 						if (reg < 2)
 						{
-							snippet.Content.Add((Instruction)$"mov {(reg++ == 0 ? "ecx" : "edx")},{value}");
+							snippet.Content.Add((Instruction)SetReg(reg++ == 0 ? "ecx" : "edx", value));
 						}
 						else
 						{
@@ -128,7 +131,7 @@ namespace QHackLib.Assemble
 			return snippet;
 		}
 
-		public static AssemblySnippet FromClrCall(int targetAddr, bool regProtection, int? thisPtr, int? retBuf, params object[] arguments)
+		public static AssemblySnippet FromClrCall(nuint targetAddr, bool regProtection, nuint? thisPtr, nuint? retBuf, params object[] arguments)
 		{
 			AssemblySnippet s = new();
 			if (regProtection)
@@ -148,19 +151,18 @@ namespace QHackLib.Assemble
 		#endregion
 
 		#region Thread
-		public static AssemblySnippet StartManagedThread(Context ctx, int lpCodeAddr, int lpwStrName_System_Action)
+		public static AssemblySnippet StartManagedThread(Context ctx, nuint lpCodeAddr, nuint lpwStrName_System_Action)
 		{
-			int ctorCharPtrMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
-			int getTypeMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Type",
+			nuint getTypeMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Type",
 				t => t.Signature == "System.Type.GetType(System.String)");
-			int getPtrMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Runtime.InteropServices.Marshal",
+			nuint getPtrMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Runtime.InteropServices.Marshal",
 				t => t.Signature == "System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer(IntPtr, System.Type)");
-			int taskRunMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Threading.Tasks.Task",
+			nuint taskRunMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Threading.Tasks.Task",
 				t => t.Signature == "System.Threading.Tasks.Task.Run(System.Action)");
 			return FromCode(
 					new AssemblyCode[] {
 						(Instruction)"pushad",
-						FromClrCall(ctorCharPtrMethod,false,0,null,lpwStrName_System_Action),
+						FromConstructString(ctx,lpwStrName_System_Action),
 						(Instruction)"mov ecx,eax",
 						(Instruction)$"call {getTypeMethod}",
 						(Instruction)$"mov ecx,{lpCodeAddr}",
@@ -173,7 +175,6 @@ namespace QHackLib.Assemble
 		}
 		#endregion
 
-		private static readonly Random _random = new();
 		public List<AssemblyCode> Content
 		{
 			get;
@@ -198,39 +199,6 @@ namespace QHackLib.Assemble
 			s.Content.AddRange(code);
 			return s;
 		}
-		/// <summary>
-		/// inside loop,[esp] is the iterator
-		/// ecx will be changed
-		/// </summary>
-		/// <param name="body"></param>
-		/// <param name="times"></param>
-		/// <param name="regProtection"></param>
-		/// <returns></returns>
-		public static AssemblySnippet Loop(AssemblySnippet body, int times, bool regProtection)
-		{
-			byte[] lA = new byte[16];
-			byte[] lB = new byte[16];
-			_random.NextBytes(lA);
-			_random.NextBytes(lB);
-			AssemblySnippet s = new AssemblySnippet();
-			string labelA = "lab_" + string.Concat(lA.Select(t => t.ToString("x2")));
-			string labelB = "lab_" + string.Concat(lB.Select(t => t.ToString("x2")));
-			if (regProtection)
-				s.Content.Add(Instruction.Create("push ecx"));
-			s.Content.Add(Instruction.Create("mov ecx,0"));
-			s.Content.Add(Instruction.Create("" + labelA + ":"));
-			s.Content.Add(Instruction.Create("cmp ecx," + times + ""));
-			s.Content.Add(Instruction.Create("jge " + labelB + ""));
-			s.Content.Add(Instruction.Create("push ecx"));
-			s.Content.Add(body);
-			s.Content.Add(Instruction.Create("pop ecx"));
-			s.Content.Add(Instruction.Create("inc ecx"));
-			s.Content.Add(Instruction.Create("jmp " + labelA + ""));
-			s.Content.Add(Instruction.Create("" + labelB + ":"));
-			if (regProtection)
-				s.Content.Add(Instruction.Create("pop ecx"));
-			return s;
-		}
 
 		/// <summary>
 		/// Constructs a string from unicode wchar_t*.<br/>
@@ -242,9 +210,9 @@ namespace QHackLib.Assemble
 		/// <param name="strMemPtr">char* pointer of the string to be constructed</param>
 		/// <param name="retPtr">the pointer to receive the result</param>
 		/// <returns></returns>
-		public static AssemblySnippet FromConstructString(Context ctx, int strMemPtr)
+		public static AssemblySnippet FromConstructString(Context ctx, nuint strMemPtr)
 		{
-			int ctor = ctx.BCLAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
+			nuint ctor = ctx.BCLAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
 			return FromClrCall(ctor, false, 0, null, strMemPtr);
 		}
 
@@ -257,9 +225,9 @@ namespace QHackLib.Assemble
 		/// <param name="ctx"></param>
 		/// <param name="assemblyFileNamePtr">string object containing assembly file name</param>
 		/// <returns></returns>
-		public static AssemblySnippet FromLoadAssembly(Context ctx, int assemblyFileNamePtr)
+		public static AssemblySnippet FromLoadAssembly(Context ctx, nuint assemblyFileNamePtr)
 		{
-			int loadFrom = ctx.BCLAddressHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
+			nuint loadFrom = ctx.BCLAddressHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
 			return FromClrCall(loadFrom, false, null, null, assemblyFileNamePtr);
 		}
 

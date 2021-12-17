@@ -22,15 +22,15 @@ namespace QHackLib
 			InternalClrMethod = method;
 		}
 
-		public AssemblyCode Call(bool regProtection, int? thisPtr, int? retBuf, params object[] args)
+		public AssemblyCode Call(bool regProtection, nuint? thisPtr, nuint? retBuf, params object[] args)
 		{
-			return AssemblySnippet.FromClrCall((int)InternalClrMethod.NativeCode, regProtection, thisPtr, retBuf, args);
+			return AssemblySnippet.FromClrCall(InternalClrMethod.NativeCode, regProtection, thisPtr, retBuf, args);
 		}
-		public AssemblyCode Call(bool regProtection, AddressableTypedEntity entity, int? retBuf, params object[] args)
+		public AssemblyCode Call(bool regProtection, AddressableTypedEntity entity, nuint? retBuf, params object[] args)
 		{
-			return Call(regProtection, (int)entity.Address, retBuf, args);
+			return Call(regProtection, entity.Address, retBuf, args);
 		}
-		public HackMethodCall Call(int? thisPtr)
+		public HackMethodCall Call(nuint? thisPtr)
 		{
 			return new HackMethodCall(this, thisPtr);
 		}
@@ -71,9 +71,9 @@ namespace QHackLib
 	public class HackMethodCall
 	{
 		public HackMethod Method { get; }
-		public int? ThisPointer { get; }
+		public nuint? ThisPointer { get; }
 
-		public HackMethodCall(HackMethod method, int? thisPointer)
+		public HackMethodCall(HackMethod method, nuint? thisPointer)
 		{
 			Method = method;
 			ThisPointer = thisPointer;
@@ -81,9 +81,9 @@ namespace QHackLib
 		public HackMethodCall(HackMethod method, AddressableTypedEntity entity)
 		{
 			Method = method;
-			ThisPointer = (int)entity.Address;
+			ThisPointer = entity.Address;
 		}
-		public AssemblyCode Call(bool regProtection, int? retBuf, params object[] args)
+		public AssemblyCode Call(bool regProtection, nuint? retBuf, params object[] args)
 		{
 			return Method.Call(regProtection, ThisPointer, retBuf, args);
 		}

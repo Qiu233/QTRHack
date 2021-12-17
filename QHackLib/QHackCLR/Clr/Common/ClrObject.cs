@@ -79,7 +79,7 @@ namespace QHackCLR.Clr
 		}
 
 		public T ReadArrayElement<T>(params int[] indices) where T : unmanaged => Read<T>(GetArrayElementOffset(indices));
-		public AddressableTypedEntity GetArrayElement(int index) => GetArrayElement(index);
+		public AddressableTypedEntity GetArrayElement(int index) => GetArrayElement(new int[] { index });
 	}
 }
 // |<-----------Object-Layout------------->|

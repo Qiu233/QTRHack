@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -9,37 +10,47 @@ using System.Threading.Tasks;
 
 namespace QHackLib.Assemble
 {
+	/// <summary>
+	/// A thread-safe assembler for continuous emitting
+	/// </summary>
 	public sealed class Assembler
 	{
-		private readonly List<byte> InternalData;
-		public IReadOnlyList<byte> Data
+		private readonly AssemblySnippet InternalData;
+		public Assembler()
 		{
-			get => InternalData;
-		}
-		private nuint _IP;
-		public nuint IP => _IP;
-		public Assembler(nuint IP)
-		{
-			_IP = IP;
-			InternalData = new List<byte>();
+			InternalData = AssemblySnippet.FromEmpty();
 		}
 
 		/// <summary>
 		/// This method is thread safe.
 		/// </summary>
-		/// <param name="data"></param>
-		public void Emit(byte[] data)
+		/// <param name="inst"></param>
+		public void Emit(AssemblyCode inst)
 		{
 			lock (InternalData)
 			{
-				InternalData.AddRange(data);
-				_IP += (uint)data.Length;
+				InternalData.Content.Add(inst);
 			}
 		}
-		public void Assemble(string code) => Emit(Assemble(code, IP));
-		public void Assemble(AssemblyCode code) => Assemble(code.GetCode());
-		public byte[] GetByteCode() => InternalData.ToArray();
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		private void Emit(string inst) => Emit(Instruction.Create(inst));
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(byte v) => Emit($".byte {v}");
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(sbyte v) => Emit($".byte {v}");
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(ushort v) => Emit($".word {v}");
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(short v) => Emit($".word {v}");
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(uint v) => Emit($".int {v}");
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(int v) => Emit($".int {v}");
+
+		public void Emit(in ReadOnlySpan<byte> bs)
+		{
+			foreach (var elem in bs)
+				Emit(elem);
+		}
+
+		public byte[] GetByteCode(nuint IP) => InternalData.GetByteCode(IP);
 
 		public unsafe static byte[] Assemble(string code, nuint IP)
 		{

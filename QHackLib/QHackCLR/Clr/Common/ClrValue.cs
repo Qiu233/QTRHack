@@ -2,12 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace QHackCLR.Clr
 {
-	public sealed class ClrValue : AddressableTypedEntity
+	public unsafe sealed class ClrValue : AddressableTypedEntity
 	{
 		public ClrValue(ClrType type, nuint address) : base(type, address)
 		{
@@ -22,7 +23,7 @@ namespace QHackCLR.Clr
 		/// <returns></returns>
 		public unsafe T GetValue<T>() where T : unmanaged
 		{
-			if (Type.UserSize > sizeof(T))
+			if (Type.UserSize > Marshal.SizeOf<T>())
 				throw new InvalidOperationException("Size exceeded.");
 			return Read<T>(0);
 		}
@@ -32,12 +33,12 @@ namespace QHackCLR.Clr
 		/// </summary>
 		/// <param name="size"></param>
 		/// <returns></returns>
-		public byte[] ReadBytes(int size) => DataAccess.ReadBytes(Address, size);
+		public byte[] ReadBytes(uint size) => DataAccess.ReadBytes(Address, size);
 
 		/// <summary>
 		/// Reads bytes with default size.
 		/// </summary>
 		/// <returns></returns>
-		public byte[] ReadBytes() => DataAccess.ReadBytes(Address, (int)Type.BaseSize - IntPtr.Size);
+		public byte[] ReadBytes() => DataAccess.ReadBytes(Address, (uint)(Type.BaseSize - sizeof(nuint)));
 	}
 }

@@ -70,7 +70,7 @@ namespace QHackCLR.Dac.Interfaces
 
 		public HRESULT ReadVirtual(IntPtr self, CLRDATA_ADDRESS address, byte* buffer, uint bytesRequested, out uint bytesRead)
 		{
-			DataTarget.DataAccess.Read(address, buffer, (int)bytesRequested);
+			DataTarget.DataAccess.Read(address, buffer, bytesRequested);
 			bytesRead = bytesRequested;
 			return HRESULT.S_OK;
 		}

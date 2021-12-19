@@ -13,36 +13,36 @@ using static QHackLib.NativeFunctions;
 
 namespace QHackLib
 {
-	public sealed class Context : IDisposable
+	public sealed class QHackContext : IDisposable
 	{
 		public int ProcessID { get; }
 
 		public DataTarget DataTarget { get; }
 		public ClrRuntime Runtime { get; }
 
-		private Dictionary<ClrModule, AddressHelper> AddressHelpers { get; }
+		private Dictionary<ClrModule, CLRHelper> CLRHelpers { get; }
 
-		public AddressHelper BCLAddressHelper => AddressHelpers[Runtime.BaseClassLibrary];
+		public CLRHelper BCLHelper => CLRHelpers[Runtime.BaseClassLibrary];
 
 		public DataAccess DataAccess => DataTarget.DataAccess;
 		public nuint Handle => DataAccess.ProcessHandle;
 
 
-		private void InitAddressHelpers()
+		private void InitHelpers()
 		{
 			foreach (var module in Runtime.AppDomain.Modules)
-				AddressHelpers[module] = new AddressHelper(this, module);
+				CLRHelpers[module] = new CLRHelper(this, module);
 		}
 
-		private Context(int id)
+		private QHackContext(int id)
 		{
 			GrantPrivilege();
 			ProcessID = id;
 			DataTarget = DataTarget.AttachToProcess(id);
 			Runtime = DataTarget.ClrVersions[0].CreateRuntime();
 
-			AddressHelpers = new Dictionary<ClrModule, AddressHelper>();
-			InitAddressHelpers();
+			CLRHelpers = new Dictionary<ClrModule, CLRHelper>();
+			InitHelpers();
 		}
 
 		/// <summary>
@@ -50,11 +50,11 @@ namespace QHackLib
 		/// </summary>
 		/// <param name="moduleName"></param>
 		/// <returns></returns>
-		public AddressHelper GetAddressHelper(string moduleName) => AddressHelpers.FirstOrDefault(
+		public CLRHelper GetCLRHelper(string moduleName) => CLRHelpers.FirstOrDefault(
 			t => t.Key.Name.Equals(moduleName, StringComparison.OrdinalIgnoreCase)
 			).Value;
 
-		public static Context Create(int pid) => new(pid);
+		public static QHackContext Create(int pid) => new(pid);
 
 
 		private static void GrantPrivilege()

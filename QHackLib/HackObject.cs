@@ -34,13 +34,13 @@ namespace QHackLib
 	}
 	public class HackObject : DynamicObject, IEquatable<HackObject>
 	{
-		public Context Context { get; }
+		public QHackContext Context { get; }
 		public AddressableTypedEntity InternalClrObject { get; }
 
 		public nuint BaseAddress => InternalClrObject.Address;
 		public ClrType ClrType => InternalClrObject.Type;
 
-		public HackObject(Context context, AddressableTypedEntity clrObject)
+		public HackObject(QHackContext context, AddressableTypedEntity clrObject)
 		{
 			Context = context;
 			InternalClrObject = clrObject;
@@ -113,7 +113,7 @@ namespace QHackLib
 				uint size = iobjType.ComponentSize;
 				if (val.Type.BaseSize - 8 != size)
 					throw new HackObjectSizeNotEqualException(size, val.Type.BaseSize);
-				byte[] data = Context.DataAccess.ReadBytes(val.Address, (int)size);
+				byte[] data = Context.DataAccess.ReadBytes(val.Address, size);
 				Context.DataAccess.WriteBytes(iobj.GetArrayElementAddress(_indexes), data);
 			}
 			else if (valueType.IsValueType)
@@ -163,7 +163,7 @@ namespace QHackLib
 				uint size = val.Type.BaseSize - 8;
 				if (size != field.Type.BaseSize - 8)
 					throw new HackObjectSizeNotEqualException(field.Type.BaseSize, size);
-				byte[] data = Context.DataAccess.ReadBytes(val.Address, (int)size);
+				byte[] data = Context.DataAccess.ReadBytes(val.Address, size);
 				Context.DataAccess.WriteBytes(field.GetAddress(InternalClrObject.Address), data);
 			}
 			else if (valueType.IsValueType)//except ClrObject/ClrValueType

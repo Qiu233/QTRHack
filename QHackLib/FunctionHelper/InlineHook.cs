@@ -1,5 +1,6 @@
 ﻿using QHackCLR.DataTargets;
 using QHackLib.Assemble;
+using QHackLib.Memory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,42 +10,192 @@ using System.Threading.Tasks;
 
 namespace QHackLib.FunctionHelper
 {
-	public unsafe static class InlineHook
+	public class InlineHook : IDisposable
 	{
 		[StructLayout(LayoutKind.Sequential)]
-		public unsafe struct HookInfo
+		private unsafe struct HookInfo
 		{
-			public const int RAW_CODE_BYTES_LENGTH = 20;
+			public const int RAW_CODE_BYTES_LENGTH = 32;
 			public static readonly int HeaderSize = sizeof(HookInfo);
 			public static readonly int Offset_OnceFlag = (int)Marshal.OffsetOf<HookInfo>(nameof(OnceFlag));
 			public static readonly int Offset_SafeFreeFlag = (int)Marshal.OffsetOf<HookInfo>(nameof(SafeFreeFlag));
 			public static readonly int Offset_RawCodeLength = (int)Marshal.OffsetOf<HookInfo>(nameof(RawCodeLength));
 			public static readonly int Offset_RawCodeBytes = (int)Marshal.OffsetOf<HookInfo>(nameof(RawCodeBytes));
 
-			public nuint Address_Code => AllocationAddress + (uint)HeaderSize;
-			public nuint Address_OnceFlag => AllocationAddress + (uint)Offset_OnceFlag;
-			public nuint Address_SafeFreeFlag => AllocationAddress + (uint)Offset_SafeFreeFlag;
-			public nuint Address_RawCodeLength => AllocationAddress + (uint)Offset_RawCodeLength;
-			public nuint Address_RawCodeBytes => AllocationAddress + (uint)Offset_RawCodeBytes;
+			public nuint Address_Code => AllocBase + (uint)HeaderSize;
 
-			public HookInfo(nuint allocationAddress, int onceFlag, int safeFreeFlag, byte[] rawCodeBytes)
+			public nuint Address_OnceFlag => AllocBase + (uint)Offset_OnceFlag;
+			public nuint Address_SafeFreeFlag => AllocBase + (uint)Offset_SafeFreeFlag;
+			public nuint Address_RawCodeLength => AllocBase + (uint)Offset_RawCodeLength;
+			public nuint Address_RawCodeBytes => AllocBase + (uint)Offset_RawCodeBytes;
+
+			public HookInfo(nuint allocBase, byte[] rawCodeBytes)
 			{
-				AllocationAddress = allocationAddress;
-				OnceFlag = onceFlag;
-				SafeFreeFlag = safeFreeFlag;
-				RawCodeLength = rawCodeBytes.Length;
+				if (rawCodeBytes.Length > RAW_CODE_BYTES_LENGTH)
+					throw new ArgumentOutOfRangeException(nameof(rawCodeBytes));
+				AllocBase = allocBase;
+				OnceFlag = 1;
+				SafeFreeFlag = 0; //initially safe
+				RawCodeLength = (uint)rawCodeBytes.Length;
 				for (int i = 0; i < rawCodeBytes.Length; i++)
 					RawCodeBytes[i] = rawCodeBytes[i];
 			}
 
-			public nuint AllocationAddress;
+			public nuint AllocBase;
 			public int OnceFlag;
 			public int SafeFreeFlag;
-			public int RawCodeLength;
+			public uint RawCodeLength;
 			public fixed byte RawCodeBytes[RAW_CODE_BYTES_LENGTH];
 		}
 
-		private static byte[] GetHeadBytes(byte[] code)
+		public MemoryAllocation MemoryAllocation { get; }
+		public HookParameters Parameters { get; }
+		public QHackContext Context { get; }
+		public AssemblyCode Code { get; }
+
+		private bool _IsDisposed = false;
+		public bool IsDisposed => _IsDisposed;
+
+		private readonly byte[] JmpHeadBytes;
+
+		private InlineHook(QHackContext ctx, AssemblyCode code, HookParameters parameters)
+		{
+			Context = ctx;
+			Code = code.Copy();
+			MemoryAllocation = new MemoryAllocation(ctx);
+			Parameters = parameters;
+
+			byte[] headInstBytes = GetHeadBytes(Context.DataAccess.ReadBytes(Parameters.TargetAddress, 32));
+
+			nuint allocAddr = MemoryAllocation.AllocationBase;
+			nuint safeFreeFlagAddr = allocAddr + (uint)HookInfo.Offset_SafeFreeFlag;
+			nuint onceFlagAddr = allocAddr + (uint)HookInfo.Offset_OnceFlag;
+			nuint codeAddr = allocAddr + (uint)HookInfo.HeaderSize;
+			nuint retAddr = Parameters.TargetAddress + (uint)headInstBytes.Length;
+
+			HookInfo info = new(allocAddr, headInstBytes);
+
+			Assembler assembler = new();
+			assembler.Emit(DataAccess.GetBytes(info));//emit the header before runnable code
+			assembler.Emit((Instruction)$"mov dword ptr [{safeFreeFlagAddr}],1");
+			assembler.Emit(Parameters.IsOnce ? GetOnceCheckedCode(Code, onceFlagAddr) : Code);//once or not
+			if (Parameters.RawCode)
+				assembler.Emit(headInstBytes);//emit the raw code replaced by hook jmp
+			assembler.Emit((Instruction)$"mov dword ptr [{safeFreeFlagAddr}],0");
+			assembler.Emit((Instruction)$"jmp {retAddr}");
+
+			Context.DataAccess.WriteBytes(allocAddr, assembler.GetByteCode(allocAddr));
+
+			JmpHeadBytes = new byte[headInstBytes.Length];
+			Array.Fill<byte>(JmpHeadBytes, 0x90);
+			Assembler.Assemble($"jmp {codeAddr}", Parameters.TargetAddress).CopyTo(JmpHeadBytes, 0);
+		}
+
+		public bool IsAttached()
+		{
+			byte h = Context.DataAccess.Read<byte>(Parameters.TargetAddress);
+			if (h != 0xE9)
+				return false;
+			nuint addr =
+				Parameters.TargetAddress +
+				(uint)(Context.DataAccess.Read<int>(Parameters.TargetAddress + 1)
+				+ 5 - HookInfo.HeaderSize);
+			return Context.DataAccess.Read<nuint>(addr) == addr;
+		}
+
+		/// <summary>
+		/// Attaches the hook.
+		/// Note, this method first checks if the hook is attached.
+		/// </summary>
+		/// <returns>true if attached successfully, false otherwise</returns>
+		public bool Attach()
+		{
+			if (IsAttached())
+				return false;
+			Context.DataAccess.WriteBytes(Parameters.TargetAddress, JmpHeadBytes);
+			return true;
+		}
+
+		/// <summary>
+		/// Detaches the hook.<br/>
+		/// You can reattach this hook before <see cref="Dispose"/> is called.<br/>
+		/// Note, this method first checks if the hook is attached.
+		/// </summary>
+		/// <returns>true if detached successfully, false otherwise</returns>
+		public unsafe bool Detach()
+		{
+			if (!IsAttached())
+				return false;
+			HookInfo info = GetHookInfo();
+			byte[] bs = new byte[info.RawCodeLength];
+			for (int i = 0; i < bs.Length; i++)
+				bs[i] = info.RawCodeBytes[i];
+			Context.DataAccess.WriteBytes(Parameters.TargetAddress, bs);
+			return true;
+		}
+
+		private HookInfo GetHookInfo() => Context.DataAccess.Read<HookInfo>(
+				Parameters.TargetAddress +
+				(uint)(Context.DataAccess.Read<int>(Parameters.TargetAddress + 1)
+				+ 5 - HookInfo.HeaderSize));
+
+		/// <summary>
+		/// Waits to detach until the code is executed at least once.<br/>
+		/// Only available for hooks whose <see cref="HookParameters.IsOnce"/> is true.
+		/// </summary>
+		/// <param name="timeout"></param>
+		/// <returns>true if detached successfully, false if timeout is exceeded or just failed to detach</returns>
+		public async Task<bool> WaitToDetach(int timeout)
+		{
+			if (!Parameters.IsOnce)
+				throw new InvalidOperationException("Not a once hook.");
+			HookInfo hook = GetHookInfo();
+			var wait = Task.Run(() =>
+			  {
+				  while (Context.DataAccess.Read<int>(hook.Address_OnceFlag) != 0) { }
+				  return Detach();
+			  });
+			if (await Task.WhenAny(wait, Task.Delay(timeout)) == wait)
+				return wait.Result;
+			return false;
+		}
+
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="timeout"></param>
+		/// <returns>true if <see cref="Dispose"/> is called, false if timeout is exceeded</returns>
+		public async Task<bool> WaitToDispose(int timeout)
+		{
+			HookInfo hook = GetHookInfo();
+			var wait = Task.Run(() =>
+			{
+				while (Context.DataAccess.Read<int>(hook.Address_SafeFreeFlag) != 0) { }
+				Dispose();
+			});
+			return await Task.WhenAny(wait, Task.Delay(timeout)) == wait;
+		}
+
+		/// <summary>
+		/// Disposes this hook WITHOUT any check.<br/>
+		/// Disposing a hook means detach then free the memory region the hook uses.<br/>
+		/// It's extremely dangerous to call this method.
+		/// Instead, you should call <see cref="WaitToDispose(int)"/>.
+		/// </summary>
+		public void Dispose()
+		{
+			lock (this)
+			{
+				if (_IsDisposed)
+					return;
+				GC.SuppressFinalize(this);
+				Detach();
+				MemoryAllocation.Dispose();
+				_IsDisposed = true;
+			}
+		}
+
+		private unsafe static byte[] GetHeadBytes(byte[] code)
 		{
 			fixed (byte* p = code)
 			{
@@ -53,33 +204,6 @@ namespace QHackLib.FunctionHelper
 					i += Ldasm.GetInst(i, out _, false);
 				return code[..(int)(i - p)];
 			}
-		}
-
-		public static void HookAndWait(Context Context, AssemblyCode code, nuint targetAddr, bool once)
-		{
-			HookInfo hookInfo = Hook(Context, code, targetAddr, once);
-			System.Threading.Thread.Sleep(10);
-			nuint sffAddr = hookInfo.Address_SafeFreeFlag;
-			nuint ofAddr = hookInfo.Address_OnceFlag;
-			while (Context.DataAccess.Read<int>(sffAddr) != 0 ||
-					Context.DataAccess.Read<int>(ofAddr) != 0) { }
-			Context.DataAccess.Write(targetAddr, hookInfo.RawCodeBytes, hookInfo.RawCodeLength);
-			Context.DataAccess.FreeMemory(hookInfo.AllocationAddress);
-		}
-
-		public static void FreeHook(Context Context, nuint targetAddr)
-		{
-			nuint k = targetAddr;
-
-			byte h = Context.DataAccess.Read<byte>(targetAddr);
-			if (h != 0xE9) throw new ArgumentException("Not a hooked target");
-
-			int j = Context.DataAccess.Read<int>(targetAddr + 1);
-			k += (uint)(j + 5 - HookInfo.HeaderSize);
-			HookInfo info = Context.DataAccess.Read<HookInfo>(k);
-
-			Context.DataAccess.Write(targetAddr, info.RawCodeBytes, info.RawCodeLength);
-			Context.DataAccess.FreeMemory(info.AllocationAddress);
 		}
 
 		private static AssemblyCode GetOnceCheckedCode(AssemblyCode code, nuint onceFlagAddr)
@@ -93,47 +217,44 @@ namespace QHackLib.FunctionHelper
 			return result;
 		}
 
+		public static async Task<bool> AttachOnce(QHackContext Context, AssemblyCode code, nuint targetAddr, int timeout = 1000, int size = 4096)
+		{
+			var hook = new InlineHook(Context, code, new HookParameters(targetAddr, size, true, true));
+			if (!hook.Attach())
+				return false;
+			if (!await hook.WaitToDetach(timeout))
+				return false;
+			return await hook.WaitToDispose(timeout);
+		}
+
 		/// <summary>
-		/// 这个函数被lock了，无法被多个线程同时调用，预防了一些错误
+		/// First unconditionally detaches then releases the hook safely.<br/>
+		/// For when hook objects get lost.<br/>
+		/// Note, this method will block the thread if the hook never gets safe to be released.<br/>
+		/// So you might need to wrap it in async situations by using <see cref="Task.Run{bool}(Func{Task{bool}})"/>.
 		/// </summary>
 		/// <param name="Context"></param>
-		/// <param name="code"></param>
 		/// <param name="targetAddr"></param>
-		/// <param name="once"></param>
-		/// <param name="execRaw"></param>
-		/// <param name="size"></param>
-		/// <returns></returns>
-		public static HookInfo Hook(Context Context, AssemblyCode code, nuint targetAddr, bool once, bool execRaw = true, int size = 1024)
+		/// <returns>false if the target is not a valid hook</returns>
+		public unsafe static bool FreeHook(QHackContext Context, nuint targetAddr)
 		{
-			byte[] headInstBytes = GetHeadBytes(Context.DataAccess.ReadBytes(targetAddr, 32));
+			byte h = Context.DataAccess.Read<byte>(targetAddr);
+			if (h != 0xE9)
+				return false;
+			nuint addr = targetAddr +
+				(uint)(Context.DataAccess.Read<int>(targetAddr + 1)
+				+ 5 - HookInfo.HeaderSize);
+			HookInfo hook = Context.DataAccess.Read<HookInfo>(addr);
+			if (addr != hook.AllocBase)
+				return false;
 
-			nuint allocAddr = Context.DataAccess.AllocMemory(size);
-			nuint safeFreeFlagAddr = allocAddr + (uint)HookInfo.Offset_SafeFreeFlag;
-			nuint onceFlagAddr = allocAddr + (uint)HookInfo.Offset_OnceFlag;
-			nuint codeAddr = allocAddr + (uint)HookInfo.HeaderSize;
-			nuint retAddr = targetAddr + (uint)headInstBytes.Length;
-
-			HookInfo info = new(allocAddr, 1, 1, headInstBytes);
-
-			Assembler assembler = new();
-			assembler.Emit(DataAccess.GetBytes(info));//emit the header before runnable code
-			assembler.Emit((Instruction)$"mov dword ptr [{safeFreeFlagAddr}],1");
-			assembler.Emit(once ? GetOnceCheckedCode(code, onceFlagAddr) : code);//once or not
-			if (execRaw)
-				assembler.Emit(headInstBytes);//emit the raw code replaced by hook jmp
-			assembler.Emit((Instruction)$"mov dword ptr [{safeFreeFlagAddr}],0");
-			assembler.Emit((Instruction)$"jmp {retAddr}");
-
-
-			byte[] jmpToBytesRaw = Assembler.Assemble($"jmp {codeAddr}", targetAddr);
-			byte[] jmpToBytes = new byte[headInstBytes.Length];
-			for (int i = 0; i < 5; i++)
-				jmpToBytes[i] = jmpToBytesRaw[i];
-			for (int i = 5; i < headInstBytes.Length; i++)
-				jmpToBytes[i] = 0x90;//nop
-			Context.DataAccess.WriteBytes(allocAddr, assembler.GetByteCode(allocAddr));
-			Context.DataAccess.WriteBytes(targetAddr, jmpToBytes);
-			return info;
+			byte[] bs = new byte[hook.RawCodeLength];
+			for (int i = 0; i < bs.Length; i++)
+				bs[i] = hook.RawCodeBytes[i];
+			Context.DataAccess.WriteBytes(targetAddr, bs);
+			while (Context.DataAccess.Read<int>(hook.Address_SafeFreeFlag) != 0) { }
+			Context.DataAccess.FreeMemory(hook.AllocBase);
+			return true;
 		}
 	}
 }

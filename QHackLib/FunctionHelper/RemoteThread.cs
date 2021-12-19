@@ -13,7 +13,7 @@ namespace QHackLib.FunctionHelper
 	public sealed class RemoteThread : IDisposable
 	{
 		[DllImport("kernel32.dll")]
-		internal static extern IntPtr CreateRemoteThread(
+		internal static extern nuint CreateRemoteThread(
 			nuint hProcess,
 			nuint lpThreadAttributes,
 			int dwStackSize,
@@ -31,7 +31,7 @@ namespace QHackLib.FunctionHelper
 		public nuint SafeFreeFlagAddress => Header.Address_SafeFreeFlag;
 		public nuint CodeAddress => Header.Address_Code;
 
-		public Context Context
+		public QHackContext Context
 		{
 			get;
 		}
@@ -40,10 +40,10 @@ namespace QHackLib.FunctionHelper
 			get;
 			private set;
 		}
-		private RemoteThread(Context ctx, AssemblyCode asm)
+		private RemoteThread(QHackContext ctx, AssemblyCode asm)
 		{
 			Context = ctx;
-			Header = new RemoteThreadHeader(Context.DataAccess.AllocMemory(), 1);
+			Header = new RemoteThreadHeader(Context.DataAccess.AllocMemory());
 
 			Assembler assembler = new();
 			assembler.Emit(DataAccess.GetBytes(Header));
@@ -61,7 +61,7 @@ namespace QHackLib.FunctionHelper
 		/// <param name="ctx"></param>
 		/// <param name="asm"></param>
 		/// <returns></returns>
-		public static RemoteThread Create(Context ctx, AssemblyCode asm) => new(ctx, asm);
+		public static RemoteThread Create(QHackContext ctx, AssemblyCode asm) => new(ctx, asm);
 
 		/// <summary>
 		/// Directly starts a remote native thread.<br/>
@@ -103,7 +103,7 @@ namespace QHackLib.FunctionHelper
 		/// </summary>
 		/// <param name="timeout"></param>
 		/// <returns>true if disposed successfully, false otherwise.</returns>
-		public async Task<bool> WaitDispose(int timeout)
+		public async Task<bool> WaitDispose(int timeout = 1000)
 		{
 			var wait = Task.Run(() =>
 			{
@@ -123,10 +123,10 @@ namespace QHackLib.FunctionHelper
 			public nuint Address_Code => AllocationAddress + (nuint)HeaderSize;
 			public nuint Address_SafeFreeFlag => AllocationAddress + (nuint)Offset_SafeFreeFlag;
 
-			public RemoteThreadHeader(nuint allocationAddress, int safeFreeFlag)
+			public RemoteThreadHeader(nuint allocationAddress)
 			{
 				AllocationAddress = allocationAddress;
-				SafeFreeFlag = safeFreeFlag;
+				SafeFreeFlag = 1;
 			}
 
 			public readonly nuint AllocationAddress;

@@ -13,10 +13,10 @@ namespace QHackLib
 	/// </summary>
 	public sealed class HackMethod : IEquatable<HackMethod>
 	{
-		public Context Context { get; }
+		public QHackContext Context { get; }
 		public ClrMethod InternalClrMethod { get; }
 
-		public HackMethod(Context context, ClrMethod method)
+		public HackMethod(QHackContext context, ClrMethod method)
 		{
 			Context = context;
 			InternalClrMethod = method;

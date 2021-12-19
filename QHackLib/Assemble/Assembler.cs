@@ -36,13 +36,13 @@ namespace QHackLib.Assemble
 		private void Emit(string inst) => Emit(Instruction.Create(inst));
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(byte v) => Emit($".byte {v}");
-		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(sbyte v) => Emit($".byte {v}");
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(sbyte v) => Emit($".byte {(byte)v}");
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(ushort v) => Emit($".word {v}");
-		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(short v) => Emit($".word {v}");
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(short v) => Emit($".word {(ushort)v}");
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(uint v) => Emit($".int {v}");
-		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(int v) => Emit($".int {v}");
+		[MethodImpl(MethodImplOptions.AggressiveInlining)] public void Emit(int v) => Emit($".int {(uint)v}");
 
 		public void Emit(in ReadOnlySpan<byte> bs)
 		{

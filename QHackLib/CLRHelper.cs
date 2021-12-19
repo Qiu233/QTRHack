@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace QHackLib
 {
-	public unsafe class AddressHelper
+	public unsafe class CLRHelper
 	{
-		public Context Context { get; }
+		public QHackContext Context { get; }
 		public ClrModule Module { get; }
 		public string ModuleName { get => Module.Name; }
 		public nuint this[string TypeName, string FunctionName]
@@ -23,7 +23,7 @@ namespace QHackLib
 		{
 			get => GetFunctionInstruction(TypeName, FunctionName, ILOffset);
 		}*/
-		internal AddressHelper(Context ctx, ClrModule module)
+		internal CLRHelper(QHackContext ctx, ClrModule module)
 		{
 			Module = module;
 			Context = ctx;
@@ -112,7 +112,7 @@ namespace QHackLib
 				throw new ClrTypeNotMatchedException("Ref type not matched.", nameof(value));
 			nuint addr = field.GetAddress();
 			if (field.Type.IsPrimitive)
-				Context.DataAccess.WriteBytes(addr, Context.DataAccess.ReadBytes(value.BaseAddress, (int)value.ClrType.BaseSize - sizeof(nuint) * 2));
+				Context.DataAccess.WriteBytes(addr, Context.DataAccess.ReadBytes(value.BaseAddress, (uint)(value.ClrType.BaseSize - sizeof(nuint) * 2)));
 			else
 				Context.DataAccess.Write(addr, Context.DataAccess.Read<IntPtr>(value.BaseAddress));
 		}

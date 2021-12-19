@@ -9,9 +9,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace QHackLib
+namespace QHackLib.Memory
 {
-	public unsafe class AobscanHelper
+	public unsafe static class AobscanHelper
 	{
 		[StructLayout(LayoutKind.Sequential)]
 		private struct MEMORY_BASIC_INFORMATION
@@ -36,6 +36,7 @@ namespace QHackLib
 		internal static readonly int SIZE_MBI = sizeof(MEMORY_BASIC_INFORMATION);
 
 		public static string GetMByteCode(int i) => $"{i & 0xFF:X2}{(i >> 8) & 0xFF:X2}{(i >> 16) & 0xFF:X2}{(i >> 24) & 0xFF:X2}";
+
 		private static byte Ctoh(char hex) => hex switch
 		{
 			>= '0' and <= '9' => (byte)(hex - '0'),

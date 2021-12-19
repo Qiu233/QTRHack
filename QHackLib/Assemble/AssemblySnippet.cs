@@ -151,13 +151,13 @@ namespace QHackLib.Assemble
 		#endregion
 
 		#region Thread
-		public static AssemblySnippet StartManagedThread(Context ctx, nuint lpCodeAddr, nuint lpwStrName_System_Action)
+		public static AssemblySnippet StartManagedThread(QHackContext ctx, nuint lpCodeAddr, nuint lpwStrName_System_Action)
 		{
-			nuint getTypeMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Type",
+			nuint getTypeMethod = ctx.BCLHelper.GetFunctionAddress("System.Type",
 				t => t.Signature == "System.Type.GetType(System.String)");
-			nuint getPtrMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Runtime.InteropServices.Marshal",
+			nuint getPtrMethod = ctx.BCLHelper.GetFunctionAddress("System.Runtime.InteropServices.Marshal",
 				t => t.Signature == "System.Runtime.InteropServices.Marshal.GetDelegateForFunctionPointer(IntPtr, System.Type)");
-			nuint taskRunMethod = ctx.BCLAddressHelper.GetFunctionAddress("System.Threading.Tasks.Task",
+			nuint taskRunMethod = ctx.BCLHelper.GetFunctionAddress("System.Threading.Tasks.Task",
 				t => t.Signature == "System.Threading.Tasks.Task.Run(System.Action)");
 			return FromCode(
 					new AssemblyCode[] {
@@ -210,9 +210,9 @@ namespace QHackLib.Assemble
 		/// <param name="strMemPtr">char* pointer of the string to be constructed</param>
 		/// <param name="retPtr">the pointer to receive the result</param>
 		/// <returns></returns>
-		public static AssemblySnippet FromConstructString(Context ctx, nuint strMemPtr)
+		public static AssemblySnippet FromConstructString(QHackContext ctx, nuint strMemPtr)
 		{
-			nuint ctor = ctx.BCLAddressHelper.GetFunctionAddress("System.String", "CtorCharPtr");
+			nuint ctor = ctx.BCLHelper.GetFunctionAddress("System.String", "CtorCharPtr");
 			return FromClrCall(ctor, false, 0, null, strMemPtr);
 		}
 
@@ -225,16 +225,16 @@ namespace QHackLib.Assemble
 		/// <param name="ctx"></param>
 		/// <param name="assemblyFileNamePtr">string object containing assembly file name</param>
 		/// <returns></returns>
-		public static AssemblySnippet FromLoadAssembly(Context ctx, nuint assemblyFileNamePtr)
+		public static AssemblySnippet FromLoadAssembly(QHackContext ctx, nuint assemblyFileNamePtr)
 		{
-			nuint loadFrom = ctx.BCLAddressHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
+			nuint loadFrom = ctx.BCLHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
 			return FromClrCall(loadFrom, false, null, null, assemblyFileNamePtr);
 		}
 
 		public override string GetCode() => string.Join('\n', Content);
 		public override byte[] GetByteCode(nuint IP) => Assembler.Assemble(GetCode(), IP);
 
-		public AssemblySnippet Copy()
+		public override AssemblyCode Copy()
 		{
 			AssemblySnippet ss = new();
 			ss.Content.AddRange(Content);

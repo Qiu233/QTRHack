@@ -30,6 +30,7 @@ namespace QHackLib
 
 		private void InitHelpers()
 		{
+			CLRHelpers.Clear();
 			foreach (var module in Runtime.AppDomain.Modules)
 				CLRHelpers[module] = new CLRHelper(this, module);
 		}

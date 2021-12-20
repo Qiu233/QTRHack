@@ -14,42 +14,44 @@ namespace QHackLib
 	{
 		public QHackContext Context { get; }
 		public ClrModule Module { get; }
-		public string ModuleName { get => Module.Name; }
-		public nuint this[string TypeName, string FunctionName]
+		public string ModuleName => Module.Name;
+		public nuint this[string typeName, string FunctionName]
 		{
-			get => GetFunctionAddress(TypeName, FunctionName);
+			get => GetFunctionAddress(typeName, FunctionName);
 		}
-		/*public ILToNativeMap this[string TypeName, string FunctionName, int ILOffset]
+		/*public ILToNativeMap this[string typeName, string FunctionName, int ILOffset]
 		{
-			get => GetFunctionInstruction(TypeName, FunctionName, ILOffset);
+			get => GetFunctionInstruction(typeName, FunctionName, ILOffset);
 		}*/
 		internal CLRHelper(QHackContext ctx, ClrModule module)
 		{
 			Module = module;
 			Context = ctx;
 		}
-		public ClrType GetClrType(string TypeName)
+		public ClrType GetClrType(string typeName)
 		{
-			ClrType type = Module.GetTypeByName(TypeName);
+			ClrType type = Module.GetTypeByName(typeName);
 			if (type is null)
-				throw MakeArgNotFoundException<ClrType>("TypeName", TypeName);
+				throw MakeArgNotFoundException<ClrType>("typeName", typeName);
 			return type;
 		}
 
-		public ClrMethod GetClrMethod(string TypeName, string MethodName)
+		public ClrMethod GetClrMethod(string typeName, string methodName)
 		{
-			ClrMethod[] methods = GetClrType(TypeName).MethodsInVTable.Where(t => t.Name == MethodName).ToArray();
+			ClrMethod[] methods = GetClrType(typeName).MethodsInVTable.Where(t => t.Name == methodName).ToArray();
 			if (methods.Length == 0)
-				throw MakeArgNotFoundException<ClrMethod>("MethodName", MethodName);
+				throw MakeArgNotFoundException<ClrMethod>("methodName", methodName);
 			return methods[0];
 		}
 
-		public ClrMethod GetClrMethod(string TypeName, Func<ClrMethod, bool> filter) => GetClrType(TypeName).MethodsInVTable.First(t => filter(t));
+		public ClrMethod GetClrMethod(string typeName, Func<ClrMethod, bool> filter) => GetClrType(typeName).MethodsInVTable.First(t => filter(t));
 
-		public nuint GetFunctionAddress(string TypeName, string FunctionName) => GetClrMethod(TypeName, FunctionName).NativeCode;
-		public nuint GetFunctionAddress(string TypeName, Func<ClrMethod, bool> filter) => GetClrMethod(TypeName, t => filter(t)).NativeCode;
+		public nuint GetFunctionAddress(string typeName, string FunctionName) => GetClrMethod(typeName, FunctionName).NativeCode;
+		public nuint GetFunctionAddress(string typeName, Func<ClrMethod, bool> filter) => GetClrMethod(typeName, t => filter(t)).NativeCode;
 
-		//public ILToNativeMap GetFunctionInstruction(string TypeName, string FunctionName, int ILOffset) => GetClrType(TypeName).MethodsInVTable.First(t => t.Name == FunctionName).ILOffsetMap.First(t => t.ILOffset == ILOffset);
+		//public ILToNativeMap GetFunctionInstruction(string typeName, string FunctionName, int ILOffset) => GetClrType(typeName).MethodsInVTable.First(t => t.Name == FunctionName).ILOffsetMap.First(t => t.ILOffset == ILOffset);
+
+		public ClrMethod GetClrMethodBySignature(string typeName, string signature) => GetClrMethod(typeName, m => m.Signature == signature);
 
 		public int GetStaticFieldAddress(string typeName, string fieldName)
 		{
@@ -126,7 +128,7 @@ namespace QHackLib
 			Context.DataAccess.Write<T>(field.GetAddress(), value);
 		}
 
-		private Exception MakeArgNotFoundException<T>(string fieldName, string fieldValue)
+		private static Exception MakeArgNotFoundException<T>(string fieldName, string fieldValue)
 		{
 			Type type = typeof(T);
 			if (type.IsSubclassOf(typeof(ClrType)))

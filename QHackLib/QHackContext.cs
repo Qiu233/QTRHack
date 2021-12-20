@@ -20,7 +20,7 @@ namespace QHackLib
 		public DataTarget DataTarget { get; }
 		public ClrRuntime Runtime { get; }
 
-		private Dictionary<ClrModule, CLRHelper> CLRHelpers { get; }
+		public Dictionary<ClrModule, CLRHelper> CLRHelpers { get; }
 
 		public CLRHelper BCLHelper => CLRHelpers[Runtime.BaseClassLibrary];
 
@@ -76,6 +76,12 @@ namespace QHackLib
 			OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, out nuint tokenHandle);
 			AdjustTokenPrivileges(tokenHandle, false, ref tokenPrivileges, 1024, IntPtr.Zero, 0);
 			CloseHandle(tokenHandle);
+		}
+
+		public void Flush()
+		{
+			Runtime.Flush();
+			InitHelpers();
 		}
 
 		public void Dispose() => DataTarget.Dispose();

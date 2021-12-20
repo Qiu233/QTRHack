@@ -34,6 +34,10 @@ namespace QHackCLR.Clr
 				(uint count, char* buf, out uint needed) =>
 				DataModule.GetName(count, out needed, buf));
 
+		public unsafe string GetFileName() => HelperGlobals.GetString(
+				(uint count, char* buf, out uint needed) =>
+				DataModule.GetFileName(count, out needed, buf), 1024);
+
 		public ClrType GetTypeByName(string name) => DefinedTypes.FirstOrDefault(t => t.Name == name);
 
 		/// <summary>

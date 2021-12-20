@@ -1,12 +1,14 @@
-﻿using Microsoft.Diagnostics.Runtime;
-using QHackLib;
+﻿using QHackLib;
 using QHackLib.Assemble;
 using QHackLib.FunctionHelper;
+using QHackLib.Memory;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -14,7 +16,7 @@ namespace QTRHack.Kernel
 {
 	public class GameContext : IDisposable
 	{
-		public Context ProcessContext
+		public QHackContext ProcessContext
 		{
 			get;
 		}
@@ -22,57 +24,33 @@ namespace QTRHack.Kernel
 		{
 			get;
 		}
-		public AssemblyName GameAssemblyName
-		{
-			get;
-		}
-		public AddressHelper GameAddressHelper
-		{
-			get;
-		}
+		public CLRHelper GameModuleHelper => ProcessContext.CLRHelpers.First(t
+			=> string.Equals(Path.GetFullPath(t.Key.GetFileName()),
+				Path.GetFullPath(GameProcess.MainModule.FileName),
+				StringComparison.OrdinalIgnoreCase))
+				.Value;
 
 		private GameContext(Process process)
 		{
 			GameProcess = process;
-			ProcessContext = Context.Create(process);
-			GameAddressHelper = ProcessContext.MainAddressHelper;
-			GameAssemblyName = AssemblyName.GetAssemblyName(GameProcess.MainModule.FileName);
+			ProcessContext = QHackContext.Create(process.Id);
 		}
 
-		public HackMethodCall GetStaticMethod(string typeName, Func<ClrMethod, bool> filter)
-		{
-			ClrType type = GameAddressHelper.GetClrType(typeName);
-			ClrMethod method = type.Methods.First(t => filter(t));
-			return new HackMethod(ProcessContext, method).Call(null as int?);
-		}
-		public HackMethodCall GetStaticMethod(string typeName, string sig)
-		{
-			return GetStaticMethod(typeName, t => t.Signature == sig);
-		}
-		public HackMethodCall GetStaticMethodByName(string typeName, string name)
-		{
-			return GetStaticMethod(typeName, t => t.Name == name);
-		}
-
-		/// <summary>
-		/// Use DoUpdate hook to create a managed thread.<br/>
-		/// </summary>
-		/// <remarks>When the thread is finished, remember to dispose the returned RemoteExecution object to release the memory.</remarks>
-		/// <param name="codeToRun">void (void)</param>
-		/// <returns>An RemoteExecution instance</returns>
 		public RemoteThread RunOnManagedThread(AssemblyCode codeToRun)
 		{
-			int pStr = ProcessContext.DataAccess.NewWCHARArray("System.Action");
+			using MemoryAllocation alloc = new(ProcessContext);
+			byte[] bs = Encoding.Unicode.GetBytes("System.Action");
+			alloc.Write(bs, (uint)bs.Length, 0);
+			alloc.Write<short>(0, (uint)bs.Length);
 			RemoteThread re = RemoteThread.Create(ProcessContext, codeToRun);
-			InlineHook.HookAndWait(
+			InlineHook.HookOnce(
 				ProcessContext,
 				AssemblySnippet.StartManagedThread(
 					ProcessContext,
 					re.CodeAddress,
-					pStr),
-				GameAddressHelper.
-				GetFunctionAddress("Terraria.Main", "DoUpdate"), true);
-			ProcessContext.DataAccess.FreeMemory(pStr);
+					alloc.AllocationBase),
+				GameModuleHelper.
+				GetFunctionAddress("Terraria.Main", "DoUpdate")).Wait();
 			return re;
 		}
 
@@ -84,7 +62,45 @@ namespace QTRHack.Kernel
 
 		public void Dispose()
 		{
+			GC.SuppressFinalize(this);
 			ProcessContext.Dispose();
 		}
+
+		public void Flush()
+		{
+			ProcessContext.Flush();
+		}
+
+		public async Task<bool> LoadAssembly(string assemblyFile, string typeName)
+		{
+			using MemoryAllocation alloc = new(ProcessContext);
+			var stream = new MemorySpan(ProcessContext, alloc.AllocationBase, alloc.AllocationSize).GetStream();
+			nuint pLibAsmStr = stream.IP; stream.WriteWCHARArray(assemblyFile);
+			nuint pTypeStr = stream.IP; stream.WriteWCHARArray(typeName);
+			nuint loadFrom = ProcessContext.BCLHelper.GetClrMethodBySignature("System.Reflection.Assembly",
+				"System.Reflection.Assembly.LoadFrom(System.String)").NativeCode;
+			nuint getType = ProcessContext.BCLHelper.GetClrMethodBySignature("System.Reflection.Assembly",
+				"System.Reflection.Assembly.GetType(System.String)").NativeCode;
+			nuint createInstance = ProcessContext.BCLHelper.GetClrMethodBySignature("System.Activator",
+				"System.Activator.CreateInstance(System.Type)").NativeCode;
+
+			var thCode = AssemblySnippet.FromCode(
+				new AssemblyCode[] {
+					AssemblySnippet.FromConstructString(ProcessContext, pLibAsmStr),
+					(Instruction)$"mov ecx,eax",
+					(Instruction)$"call {loadFrom}",
+					(Instruction)$"push eax",
+					AssemblySnippet.FromConstructString(ProcessContext, pTypeStr),
+					(Instruction)$"mov edx,eax",
+					(Instruction)$"pop ecx",
+					(Instruction)$"call {getType}",
+					(Instruction)$"mov ecx,eax",
+					(Instruction)$"call {createInstance}",
+			});
+			bool result = await RunOnManagedThread(thCode).WaitDispose();
+			Flush();
+			return result;
+		}
+
 	}
 }

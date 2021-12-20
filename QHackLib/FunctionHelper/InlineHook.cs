@@ -107,7 +107,7 @@ namespace QHackLib.FunctionHelper
 		/// Attaches the hook.
 		/// Note, this method first checks if the hook is attached.
 		/// </summary>
-		/// <returns>true if attached successfully, false otherwise</returns>
+		/// <returns>true if attached successfully, otherwise false</returns>
 		public bool Attach()
 		{
 			if (IsAttached())
@@ -121,7 +121,7 @@ namespace QHackLib.FunctionHelper
 		/// You can reattach this hook before <see cref="Dispose"/> is called.<br/>
 		/// Note, this method first checks if the hook is attached.
 		/// </summary>
-		/// <returns>true if detached successfully, false otherwise</returns>
+		/// <returns>true if detached successfully, otherwise false</returns>
 		public unsafe bool Detach()
 		{
 			if (!IsAttached())
@@ -217,7 +217,7 @@ namespace QHackLib.FunctionHelper
 			return result;
 		}
 
-		public static async Task<bool> AttachOnce(QHackContext Context, AssemblyCode code, nuint targetAddr, int timeout = 1000, int size = 4096)
+		public static async Task<bool> HookOnce(QHackContext Context, AssemblyCode code, nuint targetAddr, int timeout = 1000, int size = 4096)
 		{
 			var hook = new InlineHook(Context, code, new HookParameters(targetAddr, size, true, true));
 			if (!hook.Attach())

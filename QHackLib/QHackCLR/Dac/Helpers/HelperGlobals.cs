@@ -27,21 +27,23 @@ namespace QHackCLR.Dac.Helpers
 		public static T[] GetBuffer<T>(GetBufferDelegate<T> getBuffer, uint count = 0) where T : unmanaged
 		{
 			uint needed = count;
-			if (needed == 0) try { getBuffer(0, null, out needed); } catch { }
+			if (needed == 0) try { getBuffer(0, null, out needed); } catch (Exception) { }
 			T[] buffer = new T[needed];
 			fixed (T* ptr = buffer) getBuffer(needed, ptr, out needed);
 			return buffer;
 		}
 
-		public static string GetNameWithFlags(GetNameDelegateFlags getName, uint flags = 0) =>
-			GetString((uint count, char* buf, out uint needed) => getName(flags, count, out needed, buf));
+		public static string GetNameWithFlags(GetNameDelegateFlags getName, uint flags = 0, uint count = 0)
+			=> GetString((uint count, char* buf, out uint needed) => getName(flags, count, out needed, buf), count);
 
-		public static string GetStringFromObj<T>(GetStringDelegateObj<T> getStr, T obj) where T : class =>
-			GetString((uint count, char* buf, out uint needed) => getStr(obj, count, buf, out needed));
-		public static string GetStringFromAddr(GetStringDelegateFromAddr getStr, CLRDATA_ADDRESS addr) =>
-			GetString((uint count, char* buf, out uint needed) => getStr(addr, count, buf, out needed));
+		public static string GetStringFromObj<T>(GetStringDelegateObj<T> getStr, T obj, uint count = 0) where T : class
+			=> GetString((uint count, char* buf, out uint needed) => getStr(obj, count, buf, out needed), count);
+		public static string GetStringFromAddr(GetStringDelegateFromAddr getStr, CLRDATA_ADDRESS addr, uint count = 0)
+			=> GetString((uint count, char* buf, out uint needed) => getStr(addr, count, buf, out needed), count);
 
-		public static string GetString(GetStringDelegate getStr) => new(GetBuffer((uint count, char* buf, out uint needed) => getStr(count, buf, out needed))[..^1]);
+		public static string GetString(GetStringDelegate getStr, uint count = 0)
+			=> new(GetBuffer((uint count, char* buf, out uint needed)
+				=> getStr(count, buf, out needed), count).TakeWhile(c => c != '\0').ToArray());
 
 		public static CLRDATA_ADDRESS[] GetListFromObj<T>(GetListDelegateObj<T> getList, T obj, int count = 0) where T : class =>
 			GetList((uint count, CLRDATA_ADDRESS* buf, out uint needed) => getList(obj, count, buf, out needed), count);

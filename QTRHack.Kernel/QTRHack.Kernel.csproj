@@ -13,4 +13,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\QHackLib\QHackLib.csproj" />
+  </ItemGroup>
+
 </Project>

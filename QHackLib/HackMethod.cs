@@ -22,21 +22,13 @@ namespace QHackLib
 			InternalClrMethod = method;
 		}
 
-		public AssemblyCode Call(bool regProtection, nuint? thisPtr, nuint? retBuf, params object[] args)
+		public AssemblyCode Call(bool regProtection, nuint? thisPtr, nuint? retBuf, nuint? userEax, params object[] args)
 		{
-			return AssemblySnippet.FromClrCall(InternalClrMethod.NativeCode, regProtection, thisPtr, retBuf, args);
-		}
-		public AssemblyCode Call(bool regProtection, AddressableTypedEntity entity, nuint? retBuf, params object[] args)
-		{
-			return Call(regProtection, entity.Address, retBuf, args);
+			return AssemblySnippet.FromClrCall(InternalClrMethod.NativeCode, regProtection, thisPtr, retBuf, userEax, args);
 		}
 		public HackMethodCall Call(nuint? thisPtr)
 		{
 			return new HackMethodCall(this, thisPtr);
-		}
-		public HackMethodCall Call(AddressableTypedEntity entity)
-		{
-			return new HackMethodCall(this, entity);
 		}
 
 		public override bool Equals(object obj)
@@ -83,9 +75,9 @@ namespace QHackLib
 			Method = method;
 			ThisPointer = entity.Address;
 		}
-		public AssemblyCode Call(bool regProtection, nuint? retBuf, params object[] args)
+		public AssemblyCode Call(bool regProtection, nuint? retBuf, nuint? userEax, params object[] args)
 		{
-			return Method.Call(regProtection, ThisPointer, retBuf, args);
+			return Method.Call(regProtection, ThisPointer, retBuf, userEax, args);
 		}
 	}
 }

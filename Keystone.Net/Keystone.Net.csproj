@@ -7,14 +7,15 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <OutputPath>D:\Projects\QTRHack\Release\</OutputPath>
+    <OutputPath>D:\Projects\QTRHack\Debug\</OutputPath>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <OutputPath>D:\Projects\QTRHack\Release\</OutputPath>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>xcopy "..\..\refdlls\keystone.dll" ".\" /D /F /K /R /Y</PostBuildEvent>
+    <PostBuildEvent>xcopy "$(SolutionDir)refdlls\keystone.dll" ".\" /D /F /K /R /Y</PostBuildEvent>
     <StartupObject />
   </PropertyGroup>
 </Project>

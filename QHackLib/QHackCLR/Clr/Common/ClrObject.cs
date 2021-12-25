@@ -1,4 +1,5 @@
-﻿using QHackCLR.Dac.Interfaces;
+﻿using QHackCLR.Clr.Builders.Helpers;
+using QHackCLR.Dac.Interfaces;
 using QHackCLR.Dac.Utils;
 using QHackCLR.DataTargets;
 using System;
@@ -9,22 +10,41 @@ using System.Threading.Tasks;
 
 namespace QHackCLR.Clr
 {
+	/// <summary>
+	/// Represents objects allocated on the heap.
+	/// </summary>
 	public unsafe sealed class ClrObject : AddressableTypedEntity
 	{
+		public override ClrType Type { get; }
 		public readonly DacpObjectData Data;
-		public ClrObject(ClrType type, nuint address) : base(type, address)
+		public ClrObject(IClrObjectHelper helper, nuint address) : base(helper, address)
 		{
-			ClrObjectHelper.SOSDac.GetObjectData(address, out Data);
+			helper.SOSDac.GetObjectData(address, out Data);
+			Type = helper.TypeFactory.GetClrType(Data.MethodTable);
 		}
+
 		public bool IsArray => Type.IsArray;
+		public bool IsBoxed => Type.IsValueType;
 		public ulong Size => Data.Size;
 
-		public int GetLength()
+		public unsafe ClrValue BoxedValue
 		{
-			if (!IsArray)
-				throw new InvalidOperationException("Not an array");
-			return Read<int>(sizeof(nuint));
+			get
+			{
+				if (!IsBoxed)
+					throw new InvalidOperationException("Not an boxed value.");
+				return new ClrValue(Type, Address + (uint)sizeof(nuint));
+			}
 		}
+
+		public unsafe override AddressableTypedEntity GetFieldValue(string name)
+		{
+			ClrInstanceField field = Type.EnumerateInstanceFields().FirstOrDefault(t => t.Name == name) ??
+				throw new ArgumentException("No such field", nameof(name));
+			return field.GetValue(Address + (uint)sizeof(nuint));
+		}
+
+		public int GetLength() => Read<int>((uint)sizeof(nuint));
 
 		public int GetLength(int dimension)
 		{
@@ -33,7 +53,7 @@ namespace QHackCLR.Clr
 				throw new ArgumentOutOfRangeException(nameof(dimension));
 			if (Type.CorElementType == CorElementType.SZArray)//SZArray
 				return GetLength();
-			return Read<int>(sizeof(nuint) * 2 + sizeof(int) * dimension);
+			return Read<int>((uint)(sizeof(nuint) * 2 + sizeof(int) * dimension));
 		}
 
 		public int GetLowerBound(int dimension)
@@ -43,16 +63,25 @@ namespace QHackCLR.Clr
 				throw new ArgumentOutOfRangeException(nameof(dimension));
 			if (rank == 1)
 				return 0;
-			return Read<int>(sizeof(nuint) * 2 + sizeof(int) * (rank + dimension));
+			return Read<int>((uint)(sizeof(nuint) * 2 + sizeof(int) * (rank + dimension)));
 		}
 
-		public int GetArrayElementOffset(params int[] indices)
+		public nuint GetElementsBase()
+		{
+			if (!Type.IsArray)
+				throw new InvalidOperationException("Not an array");
+			if (Type.CorElementType == CorElementType.SZArray)
+				return (uint)(sizeof(nuint) * 2);
+			return (uint)(sizeof(nuint) * 2 + (8 * Type.Rank));
+		}
+
+		public uint GetArrayElementOffset(params int[] indices)
 		{
 			int rank = Type.Rank;
 			if (indices.Length != rank)
 				throw new ArgumentException("Rank does not match", nameof(indices));
 			if (Type.CorElementType == CorElementType.SZArray)
-				return sizeof(nuint) * 2 + (indices[0] * (int)Type.ComponentSize);
+				return (uint)(sizeof(nuint) * 2 + (indices[0] * Type.ComponentSize));
 			int offset = 0;
 			for (int i = 0; i < rank; i++)
 			{
@@ -62,20 +91,20 @@ namespace QHackCLR.Clr
 				offset *= GetLength(i);
 				offset += currentValueOffset;
 			}
-			return sizeof(nuint) * 2 + (8 * rank) + (int)(offset * Type.ComponentSize);
+			return (uint)(sizeof(nuint) * 2 + (8 * rank) + (offset * Type.ComponentSize));
 		}
 
-		public nuint GetArrayElementAddress(params int[] indices) => Address + (nuint)GetArrayElementOffset(indices);
+		public nuint GetArrayElementAddress(params int[] indices) => Address + GetArrayElementOffset(indices);
 
 		public AddressableTypedEntity GetArrayElement(params int[] indices)
 		{
 			if (!Type.IsArray)
 				throw new InvalidOperationException("Not an array");
-			int offset = GetArrayElementOffset(indices);
+			uint offset = GetArrayElementOffset(indices);
 			ClrType componentType = Type.ComponentType;
 			if (componentType.IsValueType)
-				return new ClrValue(componentType, Address + (uint)offset);
-			return new ClrObject(componentType, Read<nuint>(offset));
+				return new ClrValue(componentType, Address + offset);
+			return new ClrObject(ObjectHelper, Read<nuint>(offset));
 		}
 
 		public T ReadArrayElement<T>(params int[] indices) where T : unmanaged => Read<T>(GetArrayElementOffset(indices));

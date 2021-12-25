@@ -14,9 +14,9 @@ namespace QHackLib.Memory
 	{
 		public QHackContext Context { get; }
 		public nuint AllocationBase { get; }
-		public int AllocationSize { get; }
+		public uint AllocationSize { get; }
 
-		public MemoryAllocation(QHackContext ctx, int size = 0x1000)
+		public MemoryAllocation(QHackContext ctx, uint size = 0x1000)
 		{
 			Context = ctx;
 			AllocationBase = ctx.DataAccess.AllocMemory(size);
@@ -29,7 +29,7 @@ namespace QHackLib.Memory
 		/// <param name="ctx"></param>
 		/// <param name="base"></param>
 		/// <param name="size"></param>
-		internal MemoryAllocation(QHackContext ctx, nuint @base, int size)
+		internal MemoryAllocation(QHackContext ctx, nuint @base, uint size)
 		{
 			Context = ctx;
 			AllocationBase = @base;
@@ -41,7 +41,7 @@ namespace QHackLib.Memory
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
 			get
 			{
-				(int off, int len) = r.GetOffsetAndLength(AllocationSize);
+				(int off, int len) = r.GetOffsetAndLength((int)AllocationSize);
 				return new MemorySpan(Context, AllocationBase + (uint)off, len);
 			}
 		}

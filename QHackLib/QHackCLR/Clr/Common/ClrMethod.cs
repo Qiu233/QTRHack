@@ -58,7 +58,7 @@ namespace QHackCLR.Clr
 		public ClrType DeclaringType => _DeclaringType ??= MethodHelper.TypeFactory.GetClrType(Data.MethodTablePtr);
 		public nuint NativeCode => Data.NativeCodeAddr;
 
-		public string GetSignature()
+		/*public string GetSignature()
 		{
 			var module = DeclaringType.Module;
 			var metadata = module.MetadataImport;
@@ -75,7 +75,7 @@ namespace QHackCLR.Clr
 				Select(s => $"{s.First.Type.Type} {s.Second}")));
 			sigBuilder.Append(')');
 			return sigBuilder.ToString();
-		}
+		}*/
 
 		private IEnumerable<(int, string, int)> EnumerateParams()
 		{

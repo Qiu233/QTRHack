@@ -103,7 +103,7 @@ namespace QHackLib.FunctionHelper
 		/// </summary>
 		/// <param name="timeout"></param>
 		/// <returns>true if disposed successfully, false otherwise.</returns>
-		public async Task<bool> WaitDispose(int timeout = 1000)
+		public async Task<bool> WaitToDispose(int timeout = 1000)
 		{
 			var wait = Task.Run(() =>
 			{

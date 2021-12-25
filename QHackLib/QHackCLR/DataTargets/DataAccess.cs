@@ -202,16 +202,16 @@ namespace QHackCLR.DataTargets
 		/// </summary>
 		/// <param name="size">The size of memory required</param>
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public nuint AllocMemory(int size = 0x1000) =>
+		public nuint AllocMemory(uint size = 0x1000) =>
 			AllocMemory(AllocationType.MEM_COMMIT, ProtectionType.PAGE_EXECUTE_READWRITE, size);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal nuint AllocMemory(AllocationType allocationType, ProtectionType protectionType, int size = 0x1000) =>
-			VirtualAllocEx(ProcessHandle, 0, (nuint)size, allocationType, protectionType);
+		internal nuint AllocMemory(AllocationType allocationType, ProtectionType protectionType, uint size = 0x1000) =>
+			VirtualAllocEx(ProcessHandle, 0, size, allocationType, protectionType);
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal nuint AllocMemory(nuint addr, AllocationType allocationType, ProtectionType protectionType, int size = 0x1000) =>
-			VirtualAllocEx(ProcessHandle, addr, (nuint)size, allocationType, protectionType);
+		internal nuint AllocMemory(nuint addr, AllocationType allocationType, ProtectionType protectionType, uint size = 0x1000) =>
+			VirtualAllocEx(ProcessHandle, addr, size, allocationType, protectionType);
 
 		/// <summary>
 		/// Free a remote memory block
@@ -223,7 +223,7 @@ namespace QHackCLR.DataTargets
 		internal void FreeMemory(nuint addr, AllocationType allocationType = AllocationType.MEM_RELEASE) => 
 			VirtualFreeEx(ProcessHandle, addr, 0, allocationType);
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		internal void FreeMemory(nuint addr, nuint size, AllocationType allocationType = AllocationType.MEM_RELEASE) => 
+		internal void FreeMemory(nuint addr, uint size, AllocationType allocationType = AllocationType.MEM_RELEASE) => 
 			VirtualFreeEx(ProcessHandle, addr, size, allocationType);
 		#endregion
 

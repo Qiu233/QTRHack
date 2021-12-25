@@ -29,13 +29,15 @@ namespace QHackCLR.Clr
 			return FieldHelper.DataAccess.Read<T>(GetAddress());
 		}
 
+		/// <summary>
+		/// Static fields except those of primitive types are always on the heap.
+		/// </summary>
+		/// <returns></returns>
 		public AddressableTypedEntity GetValue()
 		{
-			if (Type.IsValueType)
+			if (Type.IsPrimitive)
 				return new ClrValue(Type, GetAddress());
-			return new ClrObject(Type, GetRawValue<nuint>());
+			return new ClrObject(Type.ClrObjectHelper, GetRawValue<nuint>());
 		}
-		public T GetValue<T>() where T : AddressableTypedEntity => GetValue() as T;
-
 	}
 }

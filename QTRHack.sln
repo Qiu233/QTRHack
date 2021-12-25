@@ -13,11 +13,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QHackLib", "QHackLib\QHackL
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Keystone.Net", "Keystone.Net\Keystone.Net.csproj", "{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QTRHack.ResPacker", "QTRHack.ResPacker\QTRHack.ResPacker.csproj", "{A1376969-A53D-4512-B0FD-7FF318CB8DF9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PatchLoader", "PatchLoader\PatchLoader.csproj", "{A5B48D8D-4B26-47FF-BF88-8FD2D7DB55EA}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameDataExporter", "GameDataExporter\GameDataExporter.csproj", "{073B1A7E-3B4D-40B9-8534-A9180DB0158F}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestLib", "TestLib\TestLib.csproj", "{D80EE4D0-EE21-4D17-ABBE-AC2F47900CBB}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InputFix", "Patches\InputFix\InputFix.csproj", "{0DA0D89A-2F66-432A-B56C-8862124E9814}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,18 +43,14 @@ Global
 		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5E05A43D-2D9A-4F80-B594-D39BDCD20B9D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A1376969-A53D-4512-B0FD-7FF318CB8DF9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A1376969-A53D-4512-B0FD-7FF318CB8DF9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A1376969-A53D-4512-B0FD-7FF318CB8DF9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A1376969-A53D-4512-B0FD-7FF318CB8DF9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{073B1A7E-3B4D-40B9-8534-A9180DB0158F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{073B1A7E-3B4D-40B9-8534-A9180DB0158F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{073B1A7E-3B4D-40B9-8534-A9180DB0158F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{073B1A7E-3B4D-40B9-8534-A9180DB0158F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D80EE4D0-EE21-4D17-ABBE-AC2F47900CBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D80EE4D0-EE21-4D17-ABBE-AC2F47900CBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D80EE4D0-EE21-4D17-ABBE-AC2F47900CBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D80EE4D0-EE21-4D17-ABBE-AC2F47900CBB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A5B48D8D-4B26-47FF-BF88-8FD2D7DB55EA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A5B48D8D-4B26-47FF-BF88-8FD2D7DB55EA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A5B48D8D-4B26-47FF-BF88-8FD2D7DB55EA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A5B48D8D-4B26-47FF-BF88-8FD2D7DB55EA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0DA0D89A-2F66-432A-B56C-8862124E9814}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0DA0D89A-2F66-432A-B56C-8862124E9814}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0DA0D89A-2F66-432A-B56C-8862124E9814}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0DA0D89A-2F66-432A-B56C-8862124E9814}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -74,7 +74,7 @@ namespace QTRHack.Kernel
 		public async Task<bool> LoadAssembly(string assemblyFile, string typeName)
 		{
 			using MemoryAllocation alloc = new(ProcessContext);
-			var stream = new MemorySpan(ProcessContext, alloc.AllocationBase, alloc.AllocationSize).GetStream();
+			var stream = new MemorySpan(ProcessContext, alloc.AllocationBase, (int)alloc.AllocationSize).GetStream();
 			nuint pLibAsmStr = stream.IP; stream.WriteWCHARArray(assemblyFile);
 			nuint pTypeStr = stream.IP; stream.WriteWCHARArray(typeName);
 			nuint loadFrom = ProcessContext.BCLHelper.GetClrMethodBySignature("System.Reflection.Assembly",
@@ -97,10 +97,29 @@ namespace QTRHack.Kernel
 					(Instruction)$"mov ecx,eax",
 					(Instruction)$"call {createInstance}",
 			});
-			bool result = await RunOnManagedThread(thCode).WaitDispose();
+			bool result = await RunOnManagedThread(thCode).WaitToDispose();
 			Flush();
 			return result;
 		}
 
+		public async Task<bool> LoadAssembly(string assemblyFile)
+		{
+			using MemoryAllocation alloc = new(ProcessContext);
+			var stream = new MemorySpan(ProcessContext, alloc.AllocationBase, (int)alloc.AllocationSize).GetStream();
+			stream.WriteWCHARArray(assemblyFile);
+
+			nuint loadFrom = ProcessContext.BCLHelper.GetClrMethodBySignature("System.Reflection.Assembly",
+				"System.Reflection.Assembly.LoadFrom(System.String)").NativeCode;
+
+			var thCode = AssemblySnippet.FromCode(
+				new AssemblyCode[] {
+					AssemblySnippet.FromConstructString(ProcessContext, alloc.AllocationBase),
+					(Instruction)$"mov ecx,eax",
+					(Instruction)$"call {loadFrom}",
+			});
+			bool result = await RunOnManagedThread(thCode).WaitToDispose();
+			Flush();
+			return result;
+		}
 	}
 }

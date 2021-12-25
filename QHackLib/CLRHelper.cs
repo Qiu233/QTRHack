@@ -28,19 +28,11 @@ namespace QHackLib
 			Module = module;
 			Context = ctx;
 		}
-		public ClrType GetClrType(string typeName)
-		{
-			ClrType type = Module.GetTypeByName(typeName);
-			if (type is null)
-				throw MakeArgNotFoundException<ClrType>("typeName", typeName);
-			return type;
-		}
+		public ClrType GetClrType(string typeName) => Module.GetTypeByName(typeName);
 
 		public ClrMethod GetClrMethod(string typeName, string methodName)
 		{
 			ClrMethod[] methods = GetClrType(typeName).MethodsInVTable.Where(t => t.Name == methodName).ToArray();
-			if (methods.Length == 0)
-				throw MakeArgNotFoundException<ClrMethod>("methodName", methodName);
 			return methods[0];
 		}
 
@@ -53,118 +45,36 @@ namespace QHackLib
 
 		public ClrMethod GetClrMethodBySignature(string typeName, string signature) => GetClrMethod(typeName, m => m.Signature == signature);
 
-		public int GetStaticFieldAddress(string typeName, string fieldName)
-		{
-			ClrStaticField field = GetClrType(typeName).GetStaticFieldByName(fieldName);
-			if (field is null)
-				throw MakeArgNotFoundException<ClrStaticField>("FieldName", fieldName);
-			return (int)field.GetAddress();
-		}
+		public nuint GetStaticFieldAddress(string typeName, string fieldName) => GetClrType(typeName).GetStaticFieldByName(fieldName).GetAddress();
 
-		public int GetFieldOffset(string typeName, string fieldName)
-		{
-			ClrInstanceField field = GetClrType(typeName).GetInstanceFieldByName(fieldName);
-			if (field is null)
-				throw MakeArgNotFoundException<ClrInstanceField>("FieldName", fieldName);
-			return (int)field.Offset + 4;//+4 to get true offset
-		}
+		public uint GetFieldOffset(string typeName, string fieldName) => GetClrType(typeName).GetInstanceFieldByName(fieldName).Offset + 4;//+4 to get true offset
 
-		public T GetStaticFieldValue<T>(string typeName, string fieldName) where T : unmanaged
-		{
-			ClrStaticField field = GetClrType(typeName).GetStaticFieldByName(fieldName);
-			if (field is null)
-				throw MakeArgNotFoundException<ClrStaticField>(nameof(fieldName), fieldName);
-			return Context.DataAccess.Read<T>(field.GetAddress());
-		}
-		public void SetStaticFieldValue<T>(string typeName, string fieldName, T value) where T : unmanaged
-		{
-			ClrStaticField field = GetClrType(typeName).GetStaticFieldByName(fieldName);
-			if (field is null)
-				throw MakeArgNotFoundException<ClrStaticField>(nameof(fieldName), fieldName);
-			Context.DataAccess.Write(field.GetAddress(), value);
-		}
+		public T GetStaticFieldValue<T>(string typeName, string fieldName) where T : unmanaged => Context.DataAccess.Read<T>(GetClrType(typeName).GetStaticFieldByName(fieldName).GetAddress());
+		public void SetStaticFieldValue<T>(string typeName, string fieldName, T value) where T : unmanaged => Context.DataAccess.Write(GetClrType(typeName).GetStaticFieldByName(fieldName).GetAddress(), value);
 
-		public T GetInstanceFieldValue<T>(string typeName, string fieldName, nuint obj) where T : unmanaged
-		{
-			ClrInstanceField field = GetClrType(typeName).GetInstanceFieldByName(fieldName);
-			if (field is null)
-				throw MakeArgNotFoundException<ClrInstanceField>(nameof(fieldName), fieldName);
-			return Context.DataAccess.Read<T>(field.GetAddress(obj));
-		}
+		public T GetInstanceFieldValue<T>(string typeName, string fieldName, nuint obj) where T : unmanaged => Context.DataAccess.Read<T>(GetClrType(typeName).GetInstanceFieldByName(fieldName).GetAddress(obj));
 
-		public void SetInstanceFieldValue<T>(string typeName, string fieldName, nuint obj, T value) where T : unmanaged
-		{
-			ClrInstanceField field = GetClrType(typeName).GetInstanceFieldByName(fieldName);
-			if (field is null)
-				throw MakeArgNotFoundException<ClrInstanceField>(nameof(fieldName), fieldName);
-			Context.DataAccess.Write<T>(field.GetAddress(obj), value);
-		}
+		public void SetInstanceFieldValue<T>(string typeName, string fieldName, nuint obj, T value) where T : unmanaged => Context.DataAccess.Write<T>(GetClrType(typeName).GetInstanceFieldByName(fieldName).GetAddress(obj), value);
 
-		public HackObject GetStaticHackObject(string typeName, string fieldName) =>
-			new(Context, GetClrType(typeName).GetStaticFieldByName(fieldName).GetValue());
+		public HackObject GetStaticHackObject(string typeName, string fieldName)
+			=> new(Context, GetClrType(typeName).GetStaticFieldByName(fieldName).GetValue());
 
-		public T GetStaticHackObjectValue<T>(string typeName, string fieldName) where T : unmanaged =>
-			GetClrType(typeName).GetStaticFieldByName(fieldName).GetRawValue<T>();
+		public T GetStaticHackObjectValue<T>(string typeName, string fieldName) where T : unmanaged
+			=> GetClrType(typeName).GetStaticFieldByName(fieldName).GetRawValue<T>();
 
 		public void SetStaticHackObject<T>(string typeName, string fieldName, T value) where T : HackObject
 		{
-			ClrType type = GetClrType(typeName);
-			ClrStaticField field = type.GetStaticFieldByName(fieldName);
-			if (!value.ClrType.IsPrimitive && value.ClrType != field.Type)
-				throw new ClrTypeNotMatchedException("Ref type not matched.", nameof(value));
+			ClrStaticField field = GetClrType(typeName).GetStaticFieldByName(fieldName);
 			nuint addr = field.GetAddress();
 			if (field.Type.IsPrimitive)
 				Context.DataAccess.WriteBytes(addr, Context.DataAccess.ReadBytes(value.BaseAddress, (uint)(value.ClrType.BaseSize - sizeof(nuint) * 2)));
 			else
-				Context.DataAccess.Write(addr, Context.DataAccess.Read<IntPtr>(value.BaseAddress));
+				Context.DataAccess.Write(addr, value.BaseAddress);
 		}
 
 		public void SetStaticHackObjectValue<T>(string typeName, string fieldName, T value) where T : unmanaged
-		{
-			ClrType type = GetClrType(typeName);
-			ClrStaticField field = type.GetStaticFieldByName(fieldName);
-			if (!field.Type.IsPrimitive)
-				throw new ClrTypeNotMatchedException("Ref type not matched.", nameof(fieldName));
-			Context.DataAccess.Write<T>(field.GetAddress(), value);
-		}
+			=> Context.DataAccess.Write(GetClrType(typeName).GetStaticFieldByName(fieldName).GetAddress(), value);
 
-		private static Exception MakeArgNotFoundException<T>(string fieldName, string fieldValue)
-		{
-			Type type = typeof(T);
-			if (type.IsSubclassOf(typeof(ClrType)))
-				return new ClrTypeNotFoundException($"No such type found: {fieldValue}", fieldName);
-			else if (type.IsSubclassOf(typeof(ClrStaticField)))
-				return new ClrTypeNotFoundException($"No such static field found: {fieldValue}", fieldName);
-			else if (type.IsSubclassOf(typeof(ClrInstanceField)))
-				return new ClrTypeNotFoundException($"No such static field found: {fieldValue}", fieldName);
-			else if (type.IsSubclassOf(typeof(ClrMethod)))
-				return new ClrTypeNotFoundException($"No such method found: {fieldValue}", fieldName);
-			return new ArgumentException($"No such {typeof(T).Name} found", fieldName);
-		}
 
-		internal class ClrTypeNotMatchedException : ArgumentException
-		{
-			public ClrTypeNotMatchedException(string msg, string param) : base(msg, param) { }
-		}
-		internal class ClrTypeNotFoundException : ArgumentException
-		{
-			public ClrTypeNotFoundException(string msg, string param) : base(msg, param) { }
-		}
-		internal class ClrMethodNotFoundException : ArgumentException
-		{
-			public ClrMethodNotFoundException(string msg, string param) : base(msg, param) { }
-		}
-		internal abstract class ClrFieldNotFoundException : ArgumentException
-		{
-			public ClrFieldNotFoundException(string msg, string param) : base(msg, param) { }
-		}
-		internal class ClrStaticFieldNotFoundException : ClrFieldNotFoundException
-		{
-			public ClrStaticFieldNotFoundException(string msg, string param) : base(msg, param) { }
-		}
-		internal class ClrInstanceFieldNotFoundException : ClrFieldNotFoundException
-		{
-			public ClrInstanceFieldNotFoundException(string msg, string param) : base(msg, param) { }
-		}
 	}
 }

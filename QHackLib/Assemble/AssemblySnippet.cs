@@ -131,7 +131,7 @@ namespace QHackLib.Assemble
 			return snippet;
 		}
 
-		public static AssemblySnippet FromClrCall(nuint targetAddr, bool regProtection, nuint? thisPtr, nuint? retBuf, params object[] arguments)
+		public static AssemblySnippet FromClrCall(nuint targetAddr, bool regProtection, nuint? thisPtr, nuint? retBuf, nuint? userEaxBuf, params object[] arguments)
 		{
 			AssemblySnippet s = new();
 			if (regProtection)
@@ -141,6 +141,8 @@ namespace QHackLib.Assemble
 			}
 			s.Content.Add(GetArugumentsPassing(thisPtr, retBuf, arguments));
 			s.Content.Add(Instruction.Create($"call {targetAddr}"));
+			if (userEaxBuf != null)
+				s.Content.Add(Instruction.Create($"mov dword ptr [{userEaxBuf}],eax"));
 			if (regProtection)
 			{
 				s.Content.Add(Instruction.Create("pop edx"));
@@ -213,7 +215,7 @@ namespace QHackLib.Assemble
 		public static AssemblySnippet FromConstructString(QHackContext ctx, nuint strMemPtr)
 		{
 			nuint ctor = ctx.BCLHelper.GetFunctionAddress("System.String", "CtorCharPtr");
-			return FromClrCall(ctor, false, 0, null, strMemPtr);
+			return FromClrCall(ctor, false, thisPtr: 0, retBuf: null, userEaxBuf: null, strMemPtr);
 		}
 
 		/// <summary>
@@ -228,7 +230,34 @@ namespace QHackLib.Assemble
 		public static AssemblySnippet FromLoadAssembly(QHackContext ctx, nuint assemblyFileNamePtr)
 		{
 			nuint loadFrom = ctx.BCLHelper.GetFunctionAddress("System.Reflection.Assembly", "LoadFrom");
-			return FromClrCall(loadFrom, false, null, null, assemblyFileNamePtr);
+			return FromClrCall(loadFrom, false, null, null, null, assemblyFileNamePtr);
+		}
+
+		private static readonly Random random = new();
+		public static AssemblySnippet Loop(AssemblySnippet body, int times, bool regProtection)
+		{
+			byte[] lA = new byte[16];
+			byte[] lB = new byte[16];
+			random.NextBytes(lA);
+			random.NextBytes(lB);
+			AssemblySnippet s = new();
+			string labelA = "lab_" + string.Concat(lA.Select(t => t.ToString("x2")));
+			string labelB = "lab_" + string.Concat(lB.Select(t => t.ToString("x2")));
+			if (regProtection)
+				s.Content.Add(Instruction.Create("push ecx"));
+			s.Content.Add(Instruction.Create("mov ecx,0"));
+			s.Content.Add(Instruction.Create("" + labelA + ":"));
+			s.Content.Add(Instruction.Create("cmp ecx," + times + ""));
+			s.Content.Add(Instruction.Create("jge " + labelB + ""));
+			s.Content.Add(Instruction.Create("push ecx"));
+			s.Content.Add(body);
+			s.Content.Add(Instruction.Create("pop ecx"));
+			s.Content.Add(Instruction.Create("inc ecx"));
+			s.Content.Add(Instruction.Create("jmp " + labelA + ""));
+			s.Content.Add(Instruction.Create("" + labelB + ":"));
+			if (regProtection)
+				s.Content.Add(Instruction.Create("pop ecx"));
+			return s;
 		}
 
 		public override string GetCode() => string.Join('\n', Content);

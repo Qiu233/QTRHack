@@ -1,4 +1,5 @@
-﻿using QHackCLR.DataTargets;
+﻿using QHackCLR.Clr.Builders.Helpers;
+using QHackCLR.DataTargets;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,8 +11,17 @@ namespace QHackCLR.Clr
 {
 	public unsafe sealed class ClrValue : AddressableTypedEntity
 	{
-		public ClrValue(ClrType type, nuint address) : base(type, address)
+		public override ClrType Type { get; }
+		public ClrValue(ClrType type, nuint address) : base(type.ClrObjectHelper, address)
 		{
+			Type = type;
+		}
+
+		public override AddressableTypedEntity GetFieldValue(string name)
+		{
+			ClrInstanceField field = Type.EnumerateInstanceFields().FirstOrDefault(t => t.Name == name) ??
+				throw new ArgumentException("No such field", nameof(name));
+			return field.GetValue(Address);
 		}
 
 		/// <summary>

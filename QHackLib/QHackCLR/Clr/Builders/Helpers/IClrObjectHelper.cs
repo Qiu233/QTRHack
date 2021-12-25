@@ -11,6 +11,7 @@ namespace QHackCLR.Clr.Builders.Helpers
 	public interface IClrObjectHelper
 	{
 		ISOSDacInterface SOSDac { get; }
+		ITypeFactory TypeFactory { get; }
 		DataAccess DataAccess { get; }
 	}
 }
